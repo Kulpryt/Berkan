@@ -220,17 +220,17 @@ function Hero() {
               fontSize: 17, color: "var(--muted)", lineHeight: 1.8,
               marginBottom: 36, maxWidth: 480, fontWeight: 300,
             }}>
-              Étudiant en développement, je construis des produits utiles en parallèle de mes études. Créateur de <a href="https://kulpryt.com" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}>Kulpryt</a> — un studio indépendant dédié à des outils qui servent vraiment.
+              Étudiant en <strong style={{ color: "var(--text)", fontWeight: 500 }}>BUT Informatique à l'IUT Annecy</strong>, je combine Product Ownership, développement fullstack et création de SaaS. Fondateur de <a href="https://kulpryt.com" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}>Kulpryt</a> — un studio indépendant dédié à des outils concrets.
             </p>
 
             <div className="fade-up visible d3" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 40 }}>
               <a href="/cv-berkan-akin.pdf" download className="btn-primary">
                 <Download size={14} /> Télécharger mon CV
               </a>
-              <a href="https://linkedin.com/in/berkan" target="_blank" rel="noopener noreferrer" className="btn-ghost">
+              <a href="https://www.linkedin.com/in/berkan-akin" target="_blank" rel="noopener noreferrer" className="btn-ghost">
                 <Linkedin size={14} /> LinkedIn
               </a>
-              <a href="https://github.com/kulpryt" target="_blank" rel="noopener noreferrer" className="btn-ghost">
+              <a href="https://github.com/Urashy" target="_blank" rel="noopener noreferrer" className="btn-ghost">
                 <Github size={14} /> GitHub
               </a>
             </div>
@@ -238,12 +238,12 @@ function Hero() {
             {/* Stack pills */}
             <div className="fade-up visible d3" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {[
-                { label: "Next.js", icon: <Code2 size={12} /> },
+                { label: "Next.js / React", icon: <Code2 size={12} /> },
                 { label: "TypeScript", icon: <Terminal size={12} /> },
-                { label: "Tailwind CSS", icon: <Layers size={12} /> },
-                { label: "React", icon: <Code2 size={12} /> },
-                { label: "Node.js", icon: <Terminal size={12} /> },
-                { label: "Processing / Java", icon: <Code2 size={12} /> },
+                { label: ".NET 8 / C#", icon: <Code2 size={12} /> },
+                { label: "Laravel / PHP", icon: <Terminal size={12} /> },
+                { label: "Python (IA)", icon: <Code2 size={12} /> },
+                { label: "Docker / Azure", icon: <Layers size={12} /> },
               ].map(s => (
                 <span key={s.label} className="skill-pill">
                   {s.icon} {s.label}
@@ -276,10 +276,10 @@ function Hero() {
             </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {[
-                { emoji: "🎓", text: "Étudiant en développement" },
+                { emoji: "🎓", text: "BUT Informatique — IUT Annecy (USMB)" },
+                { emoji: "💼", text: "Stage ERP en cours (Jan. 2026)" },
                 { emoji: "🛠️", text: "Fondateur de Kulpryt" },
                 { emoji: "🎙️", text: "Développe Vo1ce (SaaS CRM vocal)" },
-                { emoji: "📍", text: "Disponible pour stages" },
               ].map((item, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 16 }}>{item.emoji}</span>
@@ -300,18 +300,53 @@ function Experience() {
   const [ref, visible] = useFadeIn();
   const experiences = [
     {
+      period: "Jan. 2026 — actuel",
+      title: "Stagiaire Développeur ERP",
+      company: "Stage 12 semaines",
+      desc: "Développement professionnel sur un projet ERP. Intégration dans un environnement de production réel.",
+      tags: ["Développement Pro", "ERP"],
+    },
+    {
+      period: "Avr. — Juil. 2025",
+      title: "Stagiaire DevOps / Cybersécurité",
+      company: "SILSEF, Archamps",
+      desc: "Administration système (mises à jour, antivirus, gestion des mots de passe), maintenance réseau, migration NAS, sécurisation infrastructure et automatisation de tâches administratives.",
+      tags: ["DevOps", "Cybersécurité", "Réseau", "Administration Sys."],
+    },
+    {
       period: "2025 — actuel",
       title: "Fondateur",
       company: "Kulpryt",
-      desc: "Création et développement d'un studio logiciel indépendant. Conception, développement et déploiement de SaaS en solo — dont Vo1ce, un outil de remplissage CRM par mémo vocal.",
-      tags: ["Next.js", "TypeScript", "SaaS"],
+      desc: "Création d'un studio logiciel indépendant en parallèle des études. Développement de Vo1ce (SaaS CRM vocal) et de la landing page Kulpryt — de la conception au déploiement sur Vercel.",
+      tags: ["Next.js", "TypeScript", "Nodemailer", "Google Sheets API"],
     },
     {
-      period: "2024",
-      title: "Développeur stagiaire",
-      company: "— (à compléter)",
-      desc: "Ajoute ici ton expérience de stage. C'est l'endroit parfait pour mentionner les technos utilisées et ce que tu as appris.",
-      tags: ["React", "Node.js"],
+      period: "Oct. 2025",
+      title: "Product Owner",
+      company: "AutoPulse (projet universitaire)",
+      desc: "Pilotage complet d'une plateforme de vente automobile avec estimation IA. Définition du backlog, User Stories, MVP, déploiement Azure. Architecture microservices : API .NET 8 + API Python FastAPI.",
+      tags: [".NET 8", "Python / FastAPI", "Azure", "Docker", "Microservices", "Scrum"],
+    },
+    {
+      period: "Fin 2024",
+      title: "Développeur Fullstack",
+      company: "Projet Uber (IUT Annecy)",
+      desc: "Clone des services Uber (VTC, livraison, vélos). Architecture MVC avec Laravel 10, interfaces Vue.js, gestion avancée des rôles et facturation PDF automatisée.",
+      tags: ["Laravel 10", "Vue.js", "MySQL", "MVC", "PHP"],
+    },
+    {
+      period: "Août 2024",
+      title: "Facteur (Intérim)",
+      company: "La Poste, Annemasse",
+      desc: "Gestion de la réception, du tri et de la distribution du courrier et des colis. Interactions directes avec les clients.",
+      tags: ["Logistique", "Autonomie"],
+    },
+    {
+      period: "2023",
+      title: "Baccalauréat STI2D",
+      company: "Lycée Jean Monnet, Annemasse",
+      desc: "Obtention du Bac STI2D avec mention Assez Bien. Projet de fin d'année : distributeur de bonbons Bluetooth piloté par Arduino et site web.",
+      tags: ["C++", "Arduino", "Bluetooth"],
     },
   ];
 
@@ -367,21 +402,56 @@ function Projects() {
   const [ref, visible] = useFadeIn();
   const projects = [
     {
+      name: "AutoPulse",
+      emoji: "🚗",
+      desc: "Plateforme de vente automobile avec estimation IA. Architecture microservices : API .NET 8 + API Python pour la cote intelligente. Déployé sur Azure.",
+      tags: [".NET 8", "Python / IA", "Azure", "Docker"],
+      link: "https://blazor-autopulse-c2ehbpd0hzh9e8he.francecentral-01.azurewebsites.net",
+      github: "https://github.com/Urashy/autopulse",
+      status: "En ligne",
+      statusColor: "var(--accent-bg)",
+      statusText: "var(--accent)",
+    },
+    {
+      name: "Uber Clone",
+      emoji: "🚕",
+      desc: "Clone des services Uber (VTC, livraison, vélos). Gestion avancée des rôles, facturation PDF, tableaux de bord dynamiques. Architecture MVC Laravel 10.",
+      tags: ["Laravel 10", "Vue.js", "MySQL", "MVC"],
+      link: "http://51.83.36.122:1206",
+      github: "https://github.com/sftss/Uber",
+      status: "En ligne",
+      statusColor: "var(--accent-bg)",
+      statusText: "var(--accent)",
+    },
+    {
       name: "Vo1ce",
       emoji: "🎙️",
-      desc: "SaaS qui remplit automatiquement ton CRM (HubSpot, Salesforce) à partir d'un mémo vocal. En liste d'attente.",
-      tags: ["Next.js", "AI", "SaaS", "CRM"],
+      desc: "SaaS qui remplit automatiquement ton CRM (HubSpot, Salesforce) à partir d'un mémo vocal. Inscriptions via liste d'attente Google Sheets.",
+      tags: ["Next.js", "AI", "SaaS", "Google Sheets"],
       link: "https://vo1ce.kulpryt.com",
+      github: "",
       status: "En développement",
       statusColor: "#FEF3C7",
       statusText: "#92400E",
     },
     {
+      name: "Distributeur IoT",
+      emoji: "⚙️",
+      desc: "Distributeur de bonbons piloté par Bluetooth depuis un smartphone. Programmation Arduino C++, conception 3D et site web de contrôle.",
+      tags: ["C++", "Arduino", "Bluetooth", "IoT"],
+      link: "",
+      github: "",
+      status: "Projet BAC",
+      statusColor: "var(--border)",
+      statusText: "var(--muted)",
+    },
+    {
       name: "Kulpryt",
       emoji: "🏗️",
-      desc: "Landing page de mon studio de création logicielle. Design minimaliste, formulaire de contact connecté à Infomaniak SMTP.",
+      desc: "Landing page de mon studio logiciel. Design minimaliste, formulaire de contact Infomaniak SMTP, liste d'attente Vo1ce via Google Sheets.",
       tags: ["Next.js", "TypeScript", "Nodemailer"],
       link: "https://kulpryt.com",
+      github: "",
       status: "En ligne",
       statusColor: "var(--accent-bg)",
       statusText: "var(--accent)",
@@ -389,9 +459,10 @@ function Projects() {
     {
       name: "Pong",
       emoji: "🏓",
-      desc: "Jeu Pong multijoueur local développé en Processing (Java). Converti en p5.js pour tourner dans le navigateur.",
-      tags: ["Processing", "Java", "p5.js"],
+      desc: "Pong multijoueur local développé en Processing (Java) pour explorer la POO. Converti en p5.js pour tourner dans le navigateur.",
+      tags: ["Processing", "Java", "OOP", "p5.js"],
       link: "#pong",
+      github: "",
       status: "Jouable ici",
       statusColor: "var(--border)",
       statusText: "var(--muted)",
@@ -411,7 +482,7 @@ function Projects() {
             Ce que j'ai construit
           </h2>
 
-          <div className="projects-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
+          <div className="projects-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 18 }}>
             {projects.map((p, i) => (
               <div key={i} className="project-card">
                 <div style={{
@@ -442,9 +513,18 @@ function Projects() {
                     }}>{tag}</span>
                   ))}
                 </div>
-                <a href={p.link} className="btn-ghost" style={{ fontSize: 12, padding: "7px 14px" }}>
-                  Voir <ChevronRight size={12} />
-                </a>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {p.link && p.link !== "" && (
+                    <a href={p.link} target={p.link.startsWith("http") ? "_blank" : "_self"} rel="noopener noreferrer" className="btn-ghost" style={{ fontSize: 12, padding: "7px 14px" }}>
+                      Voir <ChevronRight size={12} />
+                    </a>
+                  )}
+                  {p.github && p.github !== "" && (
+                    <a href={p.github} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ fontSize: 12, padding: "7px 14px" }}>
+                      GitHub <ExternalLink size={11} />
+                    </a>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -690,7 +770,7 @@ function PongGame() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
                 {[
                   { label: "Joueur 1", keys: "Z / S" },
-                  { label: "Joueur 2", keys: "↑ / ↓" },
+                  { label: "Joueur 2", keys: "P / M" },
                   { label: "Lancer / Reprendre", keys: "ESPACE" },
                 ].map(k => (
                   <div key={k.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -754,7 +834,7 @@ function Footer() {
         <div style={{ display: "flex", gap: 16 }}>
           <a href="https://kulpryt.com" style={{ fontSize: 13, color: "var(--muted)", textDecoration: "none" }}>Kulpryt</a>
           <a href="https://vo1ce.kulpryt.com" style={{ fontSize: 13, color: "var(--muted)", textDecoration: "none" }}>Vo1ce</a>
-          <a href="https://github.com/kulpryt" style={{ fontSize: 13, color: "var(--muted)", textDecoration: "none" }}>GitHub</a>
+          <a href="https://github.com/Urashy" style={{ fontSize: 13, color: "var(--muted)", textDecoration: "none" }}>GitHub</a>
         </div>
         <span style={{ fontSize: 13, color: "var(--muted)" }}>
           © {new Date().getFullYear()} Berkan Akin
