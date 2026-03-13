@@ -184,6 +184,8 @@ function Nav() {
           </span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <a href="#formation" className="btn-ghost" style={{ fontSize: 13, padding: "7px 14px" }}>Formation</a>
+          <a href="#experiences" className="btn-ghost" style={{ fontSize: 13, padding: "7px 14px" }}>Expériences</a>
           <a href="#projets" className="btn-ghost" style={{ fontSize: 13, padding: "7px 14px" }}>Projets</a>
           <a href="#pong" className="btn-ghost" style={{ fontSize: 13, padding: "7px 14px" }}>🏓 Pong</a>
           <a href="https://kulpryt.com" className="btn-primary" style={{ fontSize: 13, padding: "7px 16px" }}>
@@ -296,25 +298,31 @@ function Hero() {
 }
 
 /* ── EXPÉRIENCES ── */
-function Experience() {
+function Experiences() {
   const [ref, visible] = useFadeIn();
-  const experiences = [
+  const items = [
     {
       period: "Jan. 2026 — actuel",
+      type: "Stage",
+      typeBg: "var(--accent-bg)", typeColor: "var(--accent)",
       title: "Stagiaire Développeur ERP",
       company: "Stage 12 semaines",
-      desc: "Développement professionnel sur un projet ERP. Intégration dans un environnement de production réel.",
+      desc: "Développement professionnel sur un projet ERP en environnement de production réel.",
       tags: ["Développement Pro", "ERP"],
     },
     {
       period: "Avr. — Juil. 2025",
+      type: "Stage",
+      typeBg: "var(--accent-bg)", typeColor: "var(--accent)",
       title: "Stagiaire DevOps / Cybersécurité",
       company: "SILSEF, Archamps",
-      desc: "Administration système (mises à jour, antivirus, gestion des mots de passe), maintenance réseau, migration NAS, sécurisation infrastructure et automatisation de tâches administratives.",
+      desc: "Administration système, maintenance réseau, migration NAS, sécurisation infrastructure et automatisation de tâches administratives.",
       tags: ["DevOps", "Cybersécurité", "Réseau", "Administration Sys."],
     },
     {
       period: "2025 — actuel",
+      type: "Perso",
+      typeBg: "#EEF2FF", typeColor: "#4338CA",
       title: "Fondateur",
       company: "Kulpryt",
       desc: "Création d'un studio logiciel indépendant en parallèle des études. Développement de Vo1ce (SaaS CRM vocal) et de la landing page Kulpryt — de la conception au déploiement sur Vercel.",
@@ -322,69 +330,57 @@ function Experience() {
     },
     {
       period: "Oct. 2025",
+      type: "Projet",
+      typeBg: "#EEF2FF", typeColor: "#4338CA",
       title: "Product Owner",
-      company: "AutoPulse (projet universitaire)",
-      desc: "Pilotage complet d'une plateforme de vente automobile avec estimation IA. Définition du backlog, User Stories, MVP, déploiement Azure. Architecture microservices : API .NET 8 + API Python FastAPI.",
-      tags: [".NET 8", "Python / FastAPI", "Azure", "Docker", "Microservices", "Scrum"],
+      company: "AutoPulse — IUT Annecy",
+      desc: "Pilotage d'une plateforme de vente automobile avec estimation IA. Backlog, User Stories, MVP, déploiement Azure. Architecture microservices : API .NET 8 + API Python FastAPI.",
+      tags: [".NET 8", "Python / FastAPI", "Azure", "Docker", "Scrum"],
     },
     {
       period: "Fin 2024",
+      type: "Projet",
+      typeBg: "#EEF2FF", typeColor: "#4338CA",
       title: "Développeur Fullstack",
-      company: "Projet Uber (IUT Annecy)",
+      company: "Uber Clone — IUT Annecy",
       desc: "Clone des services Uber (VTC, livraison, vélos). Architecture MVC avec Laravel 10, interfaces Vue.js, gestion avancée des rôles et facturation PDF automatisée.",
       tags: ["Laravel 10", "Vue.js", "MySQL", "MVC", "PHP"],
     },
     {
       period: "Août 2024",
+      type: "Job",
+      typeBg: "#FEF3C7", typeColor: "#92400E",
       title: "Facteur (Intérim)",
       company: "La Poste, Annemasse",
       desc: "Gestion de la réception, du tri et de la distribution du courrier et des colis. Interactions directes avec les clients.",
       tags: ["Logistique", "Autonomie"],
     },
-    {
-      period: "2023",
-      title: "Baccalauréat STI2D",
-      company: "Lycée Jean Monnet, Annemasse",
-      desc: "Obtention du Bac STI2D avec mention Assez Bien. Projet de fin d'année : distributeur de bonbons Bluetooth piloté par Arduino et site web.",
-      tags: ["C++", "Arduino", "Bluetooth"],
-    },
   ];
 
   return (
-    <section style={{ padding: "80px 24px 100px", borderTop: "1px solid var(--border)" }}>
+    <section id="experiences" style={{ padding: "80px 24px 100px", borderTop: "1px solid var(--border)" }}>
       <div style={{ maxWidth: 1080, margin: "0 auto" }}>
         <div ref={ref} className={`fade-up${visible ? " visible" : ""}`}>
-          <span className="section-label" style={{ display: "block", marginBottom: 12 }}>Parcours</span>
-          <h2 style={{
-            fontFamily: "'Syne', sans-serif",
-            fontSize: "clamp(22px, 3vw, 34px)",
-            fontWeight: 700, letterSpacing: "-0.025em", marginBottom: 40,
-          }}>
-            Expériences & Formation
+          <span className="section-label" style={{ display: "block", marginBottom: 12 }}>Expériences</span>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(22px, 3vw, 34px)", fontWeight: 700, letterSpacing: "-0.025em", marginBottom: 40 }}>
+            Ce que j'ai fait
           </h2>
-
           <div>
-            {experiences.map((exp, i) => (
+            {items.map((item, i) => (
               <div key={i} className="exp-item">
-                <div>
-                  <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 400 }}>{exp.period}</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 400 }}>{item.period}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", padding: "2px 8px", borderRadius: 20, width: "fit-content", background: item.typeBg, color: item.typeColor }}>{item.type}</span>
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
-                    <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700 }}>{exp.title}</h3>
-                    <span style={{ fontSize: 14, color: "var(--accent)", fontWeight: 500 }}>@ {exp.company}</span>
+                    <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700 }}>{item.title}</h3>
+                    <span style={{ fontSize: 14, color: "var(--accent)", fontWeight: 500 }}>@ {item.company}</span>
                   </div>
-                  <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.7, marginBottom: 12, fontWeight: 300 }}>
-                    {exp.desc}
-                  </p>
+                  <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.7, marginBottom: 12, fontWeight: 300 }}>{item.desc}</p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {exp.tags.map(tag => (
-                      <span key={tag} style={{
-                        fontSize: 12, color: "var(--muted)",
-                        background: "var(--bg)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 6, padding: "2px 10px",
-                      }}>{tag}</span>
+                    {item.tags.map(tag => (
+                      <span key={tag} style={{ fontSize: 12, color: "var(--muted)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 10px" }}>{tag}</span>
                     ))}
                   </div>
                 </div>
@@ -397,6 +393,67 @@ function Experience() {
   );
 }
 
+/* ── FORMATION ── */
+function Formation() {
+  const [ref, visible] = useFadeIn();
+  const items = [
+    {
+      period: "2023 — 2026",
+      type: "Diplôme",
+      typeBg: "var(--border)", typeColor: "var(--muted)",
+      title: "BUT Informatique",
+      company: "IUT Annecy — USMB",
+      desc: "Formation en 3 ans couvrant développement logiciel, bases de données, réseaux, gestion de projet Agile et algorithmique. Parcours orienté développement fullstack et Product Ownership.",
+      tags: ["Développement", "BDD", "Réseaux", "Gestion de projet", "Algo"],
+    },
+    {
+      period: "2019 — 2023",
+      type: "Diplôme",
+      typeBg: "var(--border)", typeColor: "var(--muted)",
+      title: "Baccalauréat STI2D — Mention AB",
+      company: "Lycée Jean Monnet, Annemasse",
+      desc: "Spécialité Sciences et Technologies de l'Industrie et du Développement Durable. Projet de fin d'année : distributeur de bonbons Bluetooth piloté par Arduino et site web de contrôle.",
+      tags: ["C++", "Arduino", "Électronique", "STI2D"],
+    },
+  ];
+
+  return (
+    <section id="formation" style={{ padding: "80px 24px 100px", background: "var(--surface)", borderTop: "1px solid var(--border)" }}>
+      <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+        <div ref={ref} className={`fade-up${visible ? " visible" : ""}`}>
+          <span className="section-label" style={{ display: "block", marginBottom: 12 }}>Formation</span>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(22px, 3vw, 34px)", fontWeight: 700, letterSpacing: "-0.025em", marginBottom: 40 }}>
+            Mon parcours académique
+          </h2>
+          <div>
+            {items.map((item, i) => (
+              <div key={i} className="exp-item">
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 400 }}>{item.period}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", padding: "2px 8px", borderRadius: 20, width: "fit-content", background: item.typeBg, color: item.typeColor }}>{item.type}</span>
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
+                    <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700 }}>{item.title}</h3>
+                    <span style={{ fontSize: 14, color: "var(--accent)", fontWeight: 500 }}>@ {item.company}</span>
+                  </div>
+                  <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.7, marginBottom: 12, fontWeight: 300 }}>{item.desc}</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {item.tags.map(tag => (
+                      <span key={tag} style={{ fontSize: 12, color: "var(--muted)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 10px" }}>{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
 /* ── PROJETS ── */
 function Projects() {
   const [ref, visible] = useFadeIn();
@@ -406,7 +463,6 @@ function Projects() {
       emoji: "🚗",
       desc: "Plateforme de vente automobile avec estimation IA. Architecture microservices : API .NET 8 + API Python pour la cote intelligente. Déployé sur Azure.",
       tags: [".NET 8", "Python / IA", "Azure", "Docker"],
-      link: "https://blazor-autopulse-c2ehbpd0hzh9e8he.francecentral-01.azurewebsites.net",
       github: "https://github.com/Urashy/autopulse",
       status: "En ligne",
       statusColor: "var(--accent-bg)",
@@ -417,7 +473,6 @@ function Projects() {
       emoji: "🚕",
       desc: "Clone des services Uber (VTC, livraison, vélos). Gestion avancée des rôles, facturation PDF, tableaux de bord dynamiques. Architecture MVC Laravel 10.",
       tags: ["Laravel 10", "Vue.js", "MySQL", "MVC"],
-      link: "http://51.83.36.122:1206",
       github: "https://github.com/sftss/Uber",
       status: "En ligne",
       statusColor: "var(--accent-bg)",
@@ -596,6 +651,8 @@ function PongGame() {
                 this.vel.x *= -1;
                 this.vel.y += t.vel.y * 0.4;
               }
+              let maxSpeedY = 8; 
+              this.vel.y = p.constrain(this.vel.y, -maxSpeedY, maxSpeedY);
             }
           }
         }
@@ -688,7 +745,7 @@ function PongGame() {
             p.text(j1pt, 100, 20);
             p.text("Joueur 2 :", 280, 20);
             p.text(j2pt, 370, 20);
-            p.text("Balle sortie, point accorde a joueur " + lastWinner, 60, 300);
+            p.text("Balle sortie, point accordé au joueur " + lastWinner, 60, 300);
           } else {
             if (!isPaused) {
               ball.update();
@@ -797,8 +854,19 @@ function PongGame() {
             </div>
 
             {/* Canvas */}
-            <div className="pong-wrapper" style={{ minHeight: 380 }}>
-              <div ref={containerRef} style={{ width: "100%", lineHeight: 0 }} />
+            <div className="pong-wrapper" style={{ 
+              minHeight: 400, 
+              background: "rgb(200, 200, 200)", 
+              border: "none" 
+            }}>
+              <div ref={containerRef} style={{ 
+                width: "100%", 
+                height: "100%",
+                display: "flex", 
+                justifyContent: "center",
+                alignItems: "center"
+              }} />
+              
               {!started && (
                 <div className="pong-overlay">
                   <span style={{ fontSize: 32 }}>🏓</span>
@@ -852,7 +920,8 @@ export default function BerkanPortfolio() {
       <Nav />
       <main>
         <Hero />
-        <Experience />
+        <Formation />
+        <Experiences />
         <Projects />
         <PongGame />
       </main>
