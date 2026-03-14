@@ -320,7 +320,7 @@ function Experiences() {
       tags: ["DevOps", "Cybersécurité", "Réseau", "Administration Sys."],
     },
     {
-      period: "2025 — actuel",
+      period: "2026 — actuel",
       type: "Perso",
       typeBg: "#EEF2FF", typeColor: "#4338CA",
       title: "Fondateur",
