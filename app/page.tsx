@@ -410,7 +410,7 @@ function Formation() {
       period: "2019 — 2023",
       type: "Diplôme",
       typeBg: "var(--border)", typeColor: "var(--muted)",
-      title: "Baccalauréat STI2D — Mention AB",
+      title: "Baccalauréat STI2D — Mention Bien",
       company: "Lycée Jean Monnet, Annemasse",
       desc: "Spécialité Sciences et Technologies de l'Industrie et du Développement Durable. Projet de fin d'année : distributeur de bonbons Bluetooth piloté par Arduino et site web de contrôle.",
       tags: ["C++", "Arduino", "Électronique", "STI2D"],
