@@ -30,6 +30,11 @@ async function getQuantScore(ticker: string): Promise<number> {
     const ratings = await ratingsRes.json();
     const ratios = await ratiosRes.json();
 
+    if (ticker === "AAPL") {
+      console.log("AAPL rating:", JSON.stringify(ratings).slice(0, 300));
+      console.log("AAPL ratios:", JSON.stringify(ratios).slice(0, 300));
+    }
+
     let score = 50;
     let components = 0;
 
@@ -61,6 +66,11 @@ async function getSentimentScore(ticker: string): Promise<number> {
       `https://finnhub.io/api/v1/news-sentiment?symbol=${ticker}&token=${FINNHUB_KEY}`
     );
     const data = await res.json();
+
+    if (ticker === "AAPL") {
+      console.log("AAPL sentiment:", JSON.stringify(data).slice(0, 300));
+    }
+    
     if (!data || data.buzz === undefined) return 50;
     const bullish = (data.sentiment?.bullishPercent ?? 0.5) * 100;
     const buzz = clamp((data.buzz?.buzz ?? 0.5) * 100);
@@ -77,6 +87,10 @@ export async function GET(req: NextRequest) {
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  console.log("FMP_KEY défini ?", !!process.env.FMP_API_KEY);
+  console.log("FINNHUB_KEY défini ?", !!process.env.FINNHUB_API_KEY);
+
 
   console.log("[cron/finance] Début du scoring watchlist...");
 
