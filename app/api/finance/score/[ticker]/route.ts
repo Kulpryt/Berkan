@@ -16,71 +16,62 @@ function normalize(value: number, min: number, max: number): number {
 
 /* ── Flux A : Score Quantitatif via FMP ── */
 async function getQuantScore(ticker: string): Promise<number> {
-  const [ratingsRes, ratiosRes] = await Promise.all([
-    fetch(`https://financialmodelingprep.com/api/v3/analyst-stock-recommendations/${ticker}?limit=5&apikey=${FMP_KEY}`),
-    fetch(`https://financialmodelingprep.com/api/v3/ratios-ttm/${ticker}?apikey=${FMP_KEY}`),
-  ]);
+  try {
+    const [ratingRes, ratiosRes] = await Promise.all([
+      fetch(`https://financialmodelingprep.com/stable/ratings-snapshot?symbol=${ticker}&apikey=${FMP_KEY}`),
+      fetch(`https://financialmodelingprep.com/stable/financial-ratios?symbol=${ticker}&period=annual&limit=1&apikey=${FMP_KEY}`),
+    ]);
+    const rating = await ratingRes.json();
+    const ratios = await ratiosRes.json();
 
-  const ratings = await ratingsRes.json();
-  const ratios = await ratiosRes.json();
+    let score = 50;
+    let components = 0;
 
-  let score = 50; // base neutre
-  let components = 0;
-
-  // Composante 1 : consensus analystes (strongBuy/buy vs sell/strongSell)
-  if (Array.isArray(ratings) && ratings.length > 0) {
-    const latest = ratings[0];
-    const positive = (latest.analystRatingsbuy || 0) + (latest.analystRatingsStrongBuy || 0);
-    const negative = (latest.analystRatingsSell || 0) + (latest.analystRatingsStrongSell || 0);
-    const total = positive + negative + (latest.analystRatingsHold || 0);
-    if (total > 0) {
-      const consensusScore = clamp((positive / total) * 100);
-      score += consensusScore;
-      components++;
-    }
-  }
-
-  // Composante 2 : P/E ratio (< 15 = bien, > 40 = mauvais)
-  if (Array.isArray(ratios) && ratios.length > 0) {
-    const pe = ratios[0].peRatioTTM;
-    if (pe && pe > 0 && pe < 200) {
-      const peScore = normalize(pe, 40, 5); // inversé : PE bas = bon score
-      score += peScore;
+    // Rating score (A → 100, F → 0)
+    const ratingData = Array.isArray(rating) ? rating[0] : rating;
+    if (ratingData?.ratingScore != null) {
+      score += clamp(ratingData.ratingScore * 20); // ratingScore est sur 5
       components++;
     }
 
-    // Composante 3 : ROE (rentabilité)
-    const roe = ratios[0].returnOnEquityTTM;
-    if (roe !== undefined && roe !== null) {
-      const roeScore = normalize(roe * 100, -10, 40);
-      score += roeScore;
-      components++;
+    // Ratios
+    const r = Array.isArray(ratios) ? ratios[0] : null;
+    if (r) {
+      const pe = r.peRatio;
+      if (pe && pe > 0 && pe < 200) { score += normalize(pe, 40, 5); components++; }
+      const roe = r.returnOnEquity;
+      if (roe != null) { score += normalize(roe * 100, -10, 40); components++; }
     }
-  }
 
-  // Moyenne des composantes + base
-  if (components > 0) {
-    score = score / (components + 1); // +1 pour la base de 50
+    if (components > 0) score = score / (components + 1);
+    return Math.round(clamp(score));
+  } catch (err) {
+    console.error(`[${ticker}] getQuantScore error:`, err);
+    return 50;
   }
-
-  return Math.round(clamp(score));
 }
 
 /* ── Flux B : Score Sentiment via Finnhub ── */
 async function getSentimentScore(ticker: string): Promise<number> {
-  const res = await fetch(
-    `https://finnhub.io/api/v1/news-sentiment?symbol=${ticker}&token=${FINNHUB_KEY}`
-  );
-  const data = await res.json();
+  try {
+    const res = await fetch(
+      `https://financialmodelingprep.com/stable/grades-consensus?symbol=${ticker}&apikey=${FMP_KEY}`
+    );
+    const data = await res.json();
+    const d = Array.isArray(data) ? data[0] : data;
+    if (!d) return 50;
 
-  if (!data || data.buzz === undefined) return 50;
+    const buy = (d.strongBuy ?? 0) + (d.buy ?? 0);
+    const sell = (d.strongSell ?? 0) + (d.sell ?? 0);
+    const hold = d.hold ?? 0;
+    const total = buy + sell + hold;
 
-  // bullishPercent est déjà entre 0 et 1
-  const bullish = (data.sentiment?.bullishPercent ?? 0.5) * 100;
-  const buzz = clamp((data.buzz?.buzz ?? 0.5) * 100); // intensité des news
-
-  // Pondération : sentiment 70% + buzz 30%
-  return Math.round(clamp(bullish * 0.7 + buzz * 0.3));
+    if (total === 0) return 50;
+    return Math.round(clamp((buy / total) * 100));
+  } catch (err) {
+    console.error(`getSentimentScore error:`, err);
+    return 50;
+  }
 }
 
 /* ── Handler principal ── */
