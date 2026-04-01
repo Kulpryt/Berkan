@@ -24,6 +24,11 @@ async function getQuantScore(ticker: string): Promise<number> {
     const rating = await ratingRes.json();
     const ratios = await ratiosRes.json();
 
+    if (ticker === "AAPL") {
+      console.log("AAPL rating:", JSON.stringify(rating).slice(0, 300));
+      console.log("AAPL ratios:", JSON.stringify(ratios).slice(0, 300));
+    }
+
     let score = 50;
     let components = 0;
 
@@ -58,6 +63,11 @@ async function getSentimentScore(ticker: string): Promise<number> {
       `https://financialmodelingprep.com/stable/grades-consensus?symbol=${ticker}&apikey=${FMP_KEY}`
     );
     const data = await res.json();
+    
+    if (ticker === "AAPL") {
+      console.log("AAPL sentiment:", JSON.stringify(data).slice(0, 300));
+    }
+
     const d = Array.isArray(data) ? data[0] : data;
     if (!d) return 50;
 
