@@ -86,9 +86,10 @@ async function getSentimentScore(ticker: string): Promise<number> {
 /* ── Handler principal ── */
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { ticker: string } }
+  { params }: { params: Promise<{ ticker: string }> }
 ) {
-  const ticker = params.ticker.toUpperCase();
+  const { ticker: rawTicker } = await params;
+  const ticker = rawTicker.toUpperCase();
 
   try {
     const [quantScore, sentimentScore] = await Promise.all([
