@@ -24,8 +24,8 @@ function normalize(value: number, min: number, max: number): number {
 async function getQuantScore(ticker: string): Promise<number> {
   try {
     const [ratingsRes, ratiosRes] = await Promise.all([
-      fetch(`https://financialmodelingprep.com/api/v3/analyst-stock-recommendations/${ticker}?limit=5&apikey=${FMP_KEY}`),
-      fetch(`https://financialmodelingprep.com/api/v3/ratios-ttm/${ticker}?apikey=${FMP_KEY}`),
+      fetchWithTimeout(`https://financialmodelingprep.com/api/v3/analyst-stock-recommendations/${ticker}?limit=5&apikey=${FMP_KEY}`),
+      fetchWithTimeout(`https://financialmodelingprep.com/api/v3/ratios-ttm/${ticker}?apikey=${FMP_KEY}`),
     ]);
     const ratings = await ratingsRes.json();
     const ratios = await ratiosRes.json();
@@ -55,14 +55,15 @@ async function getQuantScore(ticker: string): Promise<number> {
 
     if (components > 0) score = score / (components + 1);
     return Math.round(clamp(score));
-  } catch {
+  } catch (err: any) {
+    console.error(`[${ticker}] getQuantScore error:`, err?.message ?? err);
     return 50;
   }
 }
 
 async function getSentimentScore(ticker: string): Promise<number> {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://finnhub.io/api/v1/news-sentiment?symbol=${ticker}&token=${FINNHUB_KEY}`
     );
     const data = await res.json();
@@ -75,7 +76,8 @@ async function getSentimentScore(ticker: string): Promise<number> {
     const bullish = (data.sentiment?.bullishPercent ?? 0.5) * 100;
     const buzz = clamp((data.buzz?.buzz ?? 0.5) * 100);
     return Math.round(clamp(bullish * 0.7 + buzz * 0.3));
-  } catch {
+  } catch (err: any) {
+    console.error(`[${ticker}] getSentimentScore error:`, err?.message ?? err);
     return 50;
   }
 }
@@ -124,4 +126,14 @@ export async function GET(req: NextRequest) {
 
   console.log(`[cron/finance] ${sorted.length} tickers scorés et stockés.`);
   return NextResponse.json({ ok: true, count: sorted.length });
+}
+
+async function fetchWithTimeout(url: string, ms = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
 }
