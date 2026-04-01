@@ -8,6 +8,12 @@ type Score = {
   quantScore: number;
   sentimentScore: number;
   conviction: number;
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+  consensus: string;
 };
 
 export default async function FinancePage() {

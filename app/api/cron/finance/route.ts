@@ -29,24 +29,34 @@ async function fetchWithTimeout(url: string, ms = 8000): Promise<Response> {
   }
 }
 
+async function safeParse(res: Response): Promise<any | null> {
+  const text = await res.text();
+  if (text.startsWith("Premium") || text.startsWith("Limit")) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 async function getQuantScore(ticker: string): Promise<number> {
   try {
     const [ratingRes, ratiosRes] = await Promise.all([
       fetchWithTimeout(`https://financialmodelingprep.com/stable/ratings-snapshot?symbol=${ticker}&apikey=${FMP_KEY}`),
       fetchWithTimeout(`https://financialmodelingprep.com/stable/financial-ratios?symbol=${ticker}&period=annual&limit=1&apikey=${FMP_KEY}`),
     ]);
-    const rating = await ratingRes.json();
-    const ratios = await ratiosRes.json();
 
-    console.log(`[${ticker}] rating:`, JSON.stringify(rating).slice(0, 200));
-    console.log(`[${ticker}] ratios:`, JSON.stringify(ratios).slice(0, 200));
+    const rating = await safeParse(ratingRes);
+    const ratios = await safeParse(ratiosRes);
 
     let score = 50;
     let components = 0;
 
+    // overallScore est sur 5 → normalisé sur 100
     const ratingData = Array.isArray(rating) ? rating[0] : rating;
-    if (ratingData?.ratingScore != null) {
-      score += clamp(ratingData.ratingScore * 20);
+    if (ratingData?.overallScore != null) {
+      const normalized = ((ratingData.overallScore - 1) / 4) * 100;
+      score += clamp(normalized);
       components++;
     }
 
@@ -66,28 +76,38 @@ async function getQuantScore(ticker: string): Promise<number> {
   }
 }
 
-async function getSentimentScore(ticker: string): Promise<number> {
+type AnalystData = {
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+  consensus: string;
+  sentimentScore: number;
+};
+
+async function getSentimentData(ticker: string): Promise<AnalystData> {
+  const empty: AnalystData = { strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0, consensus: "N/A", sentimentScore: 50 };
   try {
     const res = await fetchWithTimeout(
       `https://financialmodelingprep.com/stable/grades-consensus?symbol=${ticker}&apikey=${FMP_KEY}`
     );
-    const data = await res.json();
-
-    console.log(`[${ticker}] sentiment:`, JSON.stringify(data).slice(0, 200));
-
+    const data = await safeParse(res);
     const d = Array.isArray(data) ? data[0] : data;
-    if (!d) return 50;
+    if (!d) return empty;
 
-    const buy = (d.strongBuy ?? 0) + (d.buy ?? 0);
-    const sell = (d.strongSell ?? 0) + (d.sell ?? 0);
+    const strongBuy = d.strongBuy ?? 0;
+    const buy = d.buy ?? 0;
     const hold = d.hold ?? 0;
-    const total = buy + sell + hold;
+    const sell = d.sell ?? 0;
+    const strongSell = d.strongSell ?? 0;
+    const total = strongBuy + buy + hold + sell + strongSell;
+    const sentimentScore = total === 0 ? 50 : Math.round(clamp(((strongBuy + buy) / total) * 100));
 
-    if (total === 0) return 50;
-    return Math.round(clamp((buy / total) * 100));
+    return { strongBuy, buy, hold, sell, strongSell, consensus: d.consensus ?? "N/A", sentimentScore };
   } catch (err: any) {
-    console.error(`[${ticker}] getSentimentScore error:`, err?.message ?? err);
-    return 50;
+    console.error(`[${ticker}] getSentimentData error:`, err?.message ?? err);
+    return empty;
   }
 }
 
@@ -104,12 +124,13 @@ export async function GET(req: NextRequest) {
     const batch = WATCHLIST.slice(i, i + 5);
     const batchResults = await Promise.all(
       batch.map(async (ticker) => {
-        const [quantScore, sentimentScore] = await Promise.all([
+        const [quantScore, analystData] = await Promise.all([
           getQuantScore(ticker),
-          getSentimentScore(ticker),
+          getSentimentData(ticker),
         ]);
+        const { sentimentScore, ...analystBreakdown } = analystData;
         const conviction = Math.round(quantScore * 0.6 + sentimentScore * 0.4);
-        return { ticker, quantScore, sentimentScore, conviction };
+        return { ticker, quantScore, sentimentScore, conviction, ...analystBreakdown };
       })
     );
     results.push(...batchResults);
