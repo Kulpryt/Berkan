@@ -123,6 +123,7 @@ async function getSentimentData(ticker: string): Promise<AnalystData> {
     consensus: "N/A", sentimentScore: 50, totalAnalysts: 0,
   };
   try {
+    
     const res = await fetchWithTimeout(
       `https://financialmodelingprep.com/stable/grades-consensus?symbol=${ticker}&apikey=${FMP_KEY}`
     );

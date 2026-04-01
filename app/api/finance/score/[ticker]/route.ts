@@ -1,90 +1,82 @@
+// app/api/finance/score/[ticker]/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
+import { kv } from "@vercel/kv";
 
 const FMP_KEY = process.env.FMP_API_KEY!;
-const FINNHUB_KEY = process.env.FINNHUB_API_KEY!;
 
-/* ── Helpers de normalisation ── */
 function clamp(v: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, v));
 }
 
-// Normalise une valeur entre min/max vers 0-100
-function normalize(value: number, min: number, max: number): number {
-  if (max === min) return 50;
-  return clamp(((value - min) / (max - min)) * 100);
+async function fetchWithTimeout(url: string, ms = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
 }
 
-/* ── Flux A : Score Quantitatif via FMP ── */
+async function safeParse(res: Response): Promise<any | null> {
+  const text = await res.text();
+  if (!text || text.startsWith("Premium") || text.startsWith("Limit") || text.startsWith("<!")) return null;
+  try { return JSON.parse(text); } catch { return null; }
+}
+
 async function getQuantScore(ticker: string): Promise<number> {
   try {
-    const [ratingRes, ratiosRes] = await Promise.all([
-      fetch(`https://financialmodelingprep.com/stable/ratings-snapshot?symbol=${ticker}&apikey=${FMP_KEY}`),
-      fetch(`https://financialmodelingprep.com/stable/financial-ratios?symbol=${ticker}&period=annual&limit=1&apikey=${FMP_KEY}`),
-    ]);
-    const rating = await ratingRes.json();
-    const ratios = await ratiosRes.json();
-
-    if (ticker === "AAPL") {
-      console.log("AAPL rating:", JSON.stringify(rating).slice(0, 300));
-      console.log("AAPL ratios:", JSON.stringify(ratios).slice(0, 300));
-    }
-
-    let score = 50;
-    let components = 0;
-
-    // Rating score (A → 100, F → 0)
-    const ratingData = Array.isArray(rating) ? rating[0] : rating;
-    if (ratingData?.ratingScore != null) {
-      score += clamp(ratingData.ratingScore * 20); // ratingScore est sur 5
-      components++;
-    }
-
-    // Ratios
-    const r = Array.isArray(ratios) ? ratios[0] : null;
-    if (r) {
-      const pe = r.peRatio;
-      if (pe && pe > 0 && pe < 200) { score += normalize(pe, 40, 5); components++; }
-      const roe = r.returnOnEquity;
-      if (roe != null) { score += normalize(roe * 100, -10, 40); components++; }
-    }
-
-    if (components > 0) score = score / (components + 1);
-    return Math.round(clamp(score));
-  } catch (err) {
-    console.error(`[${ticker}] getQuantScore error:`, err);
-    return 50;
-  }
-}
-
-/* ── Flux B : Score Sentiment via Finnhub ── */
-async function getSentimentScore(ticker: string): Promise<number> {
-  try {
-    const res = await fetch(
-      `https://financialmodelingprep.com/stable/grades-consensus?symbol=${ticker}&apikey=${FMP_KEY}`
+    const res = await fetchWithTimeout(
+      `https://financialmodelingprep.com/stable/ratings-snapshot?symbol=${ticker}&apikey=${FMP_KEY}`
     );
-    const data = await res.json();
-    
-    if (ticker === "AAPL") {
-      console.log("AAPL sentiment:", JSON.stringify(data).slice(0, 300));
-    }
-
-    const d = Array.isArray(data) ? data[0] : data;
+    const rating = await safeParse(res);
+    const d = Array.isArray(rating) ? rating[0] : rating;
     if (!d) return 50;
 
-    const buy = (d.strongBuy ?? 0) + (d.buy ?? 0);
-    const sell = (d.strongSell ?? 0) + (d.sell ?? 0);
-    const hold = d.hold ?? 0;
-    const total = buy + sell + hold;
+    const subs = [
+      d.discountedCashFlowScore,
+      d.returnOnEquityScore,
+      d.returnOnAssetsScore,
+      d.debtToEquityScore,
+      d.priceToEarningsScore,
+      d.priceToBookScore,
+    ].filter((s): s is number => s != null && s >= 1);
 
-    if (total === 0) return 50;
-    return Math.round(clamp((buy / total) * 100));
-  } catch (err) {
-    console.error(`getSentimentScore error:`, err);
+    if (subs.length === 0) return 50;
+    const avg = subs.reduce((a, b) => a + b, 0) / subs.length;
+    return Math.round(clamp(((avg - 1) / 4) * 100));
+  } catch (err: any) {
+    console.error(`[${ticker}] getQuantScore error:`, err?.message ?? err);
     return 50;
   }
 }
 
-/* ── Handler principal ── */
+async function getSentimentData(ticker: string) {
+  const empty = { strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0, consensus: "N/A", sentimentScore: 50, totalAnalysts: 0 };
+  try {
+    const res = await fetchWithTimeout(
+      `https://financialmodelingprep.com/stable/grades-consensus?symbol=${ticker}&apikey=${FMP_KEY}`
+    );
+    const data = await safeParse(res);
+    const d = Array.isArray(data) ? data[0] : data;
+    if (!d) return empty;
+
+    const strongBuy  = d.strongBuy  ?? 0;
+    const buy        = d.buy        ?? 0;
+    const hold       = d.hold       ?? 0;
+    const sell       = d.sell       ?? 0;
+    const strongSell = d.strongSell ?? 0;
+    const total = strongBuy + buy + hold + sell + strongSell;
+    const sentimentScore = total === 0 ? 50 : Math.round(clamp(((strongBuy + buy) / total) * 100));
+
+    return { strongBuy, buy, hold, sell, strongSell, consensus: d.consensus ?? "N/A", sentimentScore, totalAnalysts: total };
+  } catch (err: any) {
+    console.error(`[${ticker}] getSentimentData error:`, err?.message ?? err);
+    return empty;
+  }
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ ticker: string }> }
@@ -92,19 +84,32 @@ export async function GET(
   const { ticker: rawTicker } = await params;
   const ticker = rawTicker.toUpperCase();
 
+  // 1. Cherche dans KV d'abord → 0 requête FMP
   try {
-    const [quantScore, sentimentScore] = await Promise.all([
-      getQuantScore(ticker),
-      getSentimentScore(ticker),
-    ]);
+    const stored = await kv.get<{ data: any[] }>("finance:scores");
+    const cached = stored?.data?.find(s => s.ticker === ticker);
+    if (cached) return NextResponse.json(cached);
+  } catch {
+    // KV indisponible → on continue vers FMP
+  }
 
+  // 2. Pas en cache → appel FMP live
+  try {
+    const [quantScore, analystData] = await Promise.all([
+      getQuantScore(ticker),
+      getSentimentData(ticker),
+    ]);
+    const { sentimentScore, ...analystBreakdown } = analystData;
     const conviction = Math.round(quantScore * 0.6 + sentimentScore * 0.4);
 
     return NextResponse.json({
       ticker,
+      category: "Recherche",
+      type: "stock",
       quantScore,
       sentimentScore,
       conviction,
+      ...analystBreakdown,
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
