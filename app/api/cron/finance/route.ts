@@ -48,34 +48,29 @@ async function getQuantScore(ticker: string): Promise<number> {
 
     const rating = await safeParse(ratingRes);
     const ratios = await safeParse(ratiosRes);
+    const scores: number[] = [];
 
-    let score = 50;
-    let components = 0;
-
-    // overallScore est sur 5 → normalisé sur 100
+    // overallScore 1→5 normalisé en 0→100
     const ratingData = Array.isArray(rating) ? rating[0] : rating;
     if (ratingData?.overallScore != null) {
-      const normalized = ((ratingData.overallScore - 1) / 4) * 100;
-      score += clamp(normalized);
-      components++;
+      scores.push(((ratingData.overallScore - 1) / 4) * 100);
     }
 
     const r = Array.isArray(ratios) ? ratios[0] : null;
     if (r) {
       const pe = r.peRatio;
-      if (pe && pe > 0 && pe < 200) { score += normalize(pe, 40, 5); components++; }
+      if (pe && pe > 0 && pe < 200) scores.push(normalize(pe, 40, 5));
       const roe = r.returnOnEquity;
-      if (roe != null) { score += normalize(roe * 100, -10, 40); components++; }
+      if (roe != null) scores.push(normalize(roe * 100, -10, 40));
     }
 
-    if (components > 0) score = score / (components + 1);
-    return Math.round(clamp(score));
+    if (scores.length === 0) return 50;
+    return Math.round(clamp(scores.reduce((a, b) => a + b, 0) / scores.length));
   } catch (err: any) {
     console.error(`[${ticker}] getQuantScore error:`, err?.message ?? err);
     return 50;
   }
 }
-
 type AnalystData = {
   strongBuy: number;
   buy: number;
