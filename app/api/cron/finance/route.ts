@@ -5,45 +5,52 @@ import { kv } from "@vercel/kv";
 const FMP_KEY = process.env.FMP_API_KEY!;
 
 export type AssetType = "stock" | "etf";
-export type WatchItem = { ticker: string; category: string; type: AssetType };
+export type WatchItem = { ticker: string; name: string; category: string; type: AssetType };
 
 export const WATCHLIST: WatchItem[] = [
-  { ticker: "AAPL",  category: "Big Tech",      type: "stock" },
-  { ticker: "MSFT",  category: "Big Tech",      type: "stock" },
-  { ticker: "NVDA",  category: "Big Tech",      type: "stock" },
-  { ticker: "META",  category: "Big Tech",      type: "stock" },
-  { ticker: "GOOGL", category: "Big Tech",      type: "stock" },
-  { ticker: "AMZN",  category: "Big Tech",      type: "stock" },
-  { ticker: "TSLA",  category: "Big Tech",      type: "stock" },
-  { ticker: "AMD",   category: "Big Tech",      type: "stock" },
-  { ticker: "ORCL",  category: "Big Tech",      type: "stock" },
-  { ticker: "NFLX",  category: "Big Tech",      type: "stock" },
-  { ticker: "JPM",   category: "Finance",       type: "stock" },
-  { ticker: "V",     category: "Finance",       type: "stock" },
-  { ticker: "MA",    category: "Finance",       type: "stock" },
-  { ticker: "BAC",   category: "Finance",       type: "stock" },
-  { ticker: "GS",    category: "Finance",       type: "stock" },
-  { ticker: "BRK-B", category: "Finance",       type: "stock" },
-  { ticker: "SPY",   category: "ETF Large",     type: "etf"   },
-  { ticker: "QQQ",   category: "ETF Large",     type: "etf"   },
-  { ticker: "VOO",   category: "ETF Large",     type: "etf"   },
-  { ticker: "IVV",   category: "ETF Large",     type: "etf"   },
-  { ticker: "VGT",   category: "ETF Sectoriel", type: "etf"   },
-  { ticker: "XLF",   category: "ETF Sectoriel", type: "etf"   },
-  { ticker: "XLK",   category: "ETF Sectoriel", type: "etf"   },
-  { ticker: "SOXX",  category: "ETF Sectoriel", type: "etf"   },
-  { ticker: "IBIT",  category: "Crypto ETF",    type: "etf"   },
-  { ticker: "FBTC",  category: "Crypto ETF",    type: "etf"   },
-  { ticker: "ARKB",  category: "Crypto ETF",    type: "etf"   },
-  { ticker: "ASML",  category: "Europe",        type: "stock" },
-  { ticker: "NVO",   category: "Europe",        type: "stock" },
-  { ticker: "SAP",   category: "Europe",        type: "stock" },
-  { ticker: "IDEXY", category: "Europe",        type: "stock" }, // LVMH ADR
-  { ticker: "JNJ",   category: "Dividendes",    type: "stock" },
-  { ticker: "KO",    category: "Dividendes",    type: "stock" },
-  { ticker: "PG",    category: "Dividendes",    type: "stock" },
-  { ticker: "VZ",    category: "Dividendes",    type: "stock" },
-  { ticker: "SCHD",  category: "Dividendes",    type: "etf"   },
+  // Big Tech
+  { ticker: "AAPL",  name: "Apple",           category: "Big Tech",      type: "stock" },
+  { ticker: "MSFT",  name: "Microsoft",        category: "Big Tech",      type: "stock" },
+  { ticker: "NVDA",  name: "NVIDIA",           category: "Big Tech",      type: "stock" },
+  { ticker: "META",  name: "Meta Platforms",   category: "Big Tech",      type: "stock" },
+  { ticker: "GOOGL", name: "Alphabet",         category: "Big Tech",      type: "stock" },
+  { ticker: "AMZN",  name: "Amazon",           category: "Big Tech",      type: "stock" },
+  { ticker: "TSLA",  name: "Tesla",            category: "Big Tech",      type: "stock" },
+  { ticker: "AMD",   name: "AMD",              category: "Big Tech",      type: "stock" },
+  { ticker: "ORCL",  name: "Oracle",           category: "Big Tech",      type: "stock" },
+  { ticker: "NFLX",  name: "Netflix",          category: "Big Tech",      type: "stock" },
+  // Finance
+  { ticker: "JPM",   name: "JPMorgan Chase",   category: "Finance",       type: "stock" },
+  { ticker: "V",     name: "Visa",             category: "Finance",       type: "stock" },
+  { ticker: "MA",    name: "Mastercard",       category: "Finance",       type: "stock" },
+  { ticker: "BAC",   name: "Bank of America",  category: "Finance",       type: "stock" },
+  { ticker: "GS",    name: "Goldman Sachs",    category: "Finance",       type: "stock" },
+  { ticker: "BRK-B", name: "Berkshire Hathaway", category: "Finance",    type: "stock" },
+  // ETFs larges
+  { ticker: "SPY",   name: "S&P 500 ETF",      category: "ETF Large",     type: "etf"   },
+  { ticker: "QQQ",   name: "Nasdaq 100 ETF",   category: "ETF Large",     type: "etf"   },
+  { ticker: "VOO",   name: "Vanguard S&P 500", category: "ETF Large",     type: "etf"   },
+  { ticker: "IVV",   name: "iShares S&P 500",  category: "ETF Large",     type: "etf"   },
+  // ETFs sectoriels
+  { ticker: "VGT",   name: "Vanguard IT ETF",  category: "ETF Sectoriel", type: "etf"   },
+  { ticker: "XLF",   name: "Financial ETF",    category: "ETF Sectoriel", type: "etf"   },
+  { ticker: "XLK",   name: "Technology ETF",   category: "ETF Sectoriel", type: "etf"   },
+  { ticker: "SOXX",  name: "Semiconductors ETF", category: "ETF Sectoriel", type: "etf" },
+  // Crypto ETFs
+  { ticker: "IBIT",  name: "iShares Bitcoin",  category: "Crypto ETF",    type: "etf"   },
+  { ticker: "FBTC",  name: "Fidelity Bitcoin", category: "Crypto ETF",    type: "etf"   },
+  { ticker: "ARKB",  name: "ARK Bitcoin ETF",  category: "Crypto ETF",    type: "etf"   },
+  // Europe (ADR cotés US — compatibles FMP gratuit)
+  { ticker: "ASML",  name: "ASML",             category: "Europe",        type: "stock" },
+  { ticker: "NVO",   name: "Novo Nordisk",     category: "Europe",        type: "stock" },
+  { ticker: "SAP",   name: "SAP",              category: "Europe",        type: "stock" },
+  { ticker: "IDEXY", name: "LVMH (ADR)",       category: "Europe",        type: "stock" },
+  // Dividendes
+  { ticker: "JNJ",   name: "Johnson & Johnson", category: "Dividendes",   type: "stock" },
+  { ticker: "KO",    name: "Coca-Cola",         category: "Dividendes",   type: "stock" },
+  { ticker: "PG",    name: "Procter & Gamble",  category: "Dividendes",   type: "stock" },
+  { ticker: "VZ",    name: "Verizon",           category: "Dividendes",   type: "stock" },
+  { ticker: "SCHD",  name: "Schwab Dividend ETF", category: "Dividendes", type: "etf"  },
 ];
 
 function clamp(v: number, min = 0, max = 100) { return Math.max(min, Math.min(max, v)); }
@@ -61,7 +68,6 @@ async function safeParse(res: Response): Promise<any | null> {
   try { return JSON.parse(text); } catch { return null; }
 }
 
-// ── Fear & Greed ──────────────────────────────────────────────────────
 export type FearGreedData = {
   score: number; rating: string; prevWeek: number; prevMonth: number;
 };
@@ -84,7 +90,6 @@ async function getFearAndGreed(): Promise<FearGreedData | null> {
   }
 }
 
-// ── Score quantitatif (stocks) ────────────────────────────────────────
 async function getQuantScore(ticker: string): Promise<number> {
   try {
     const res = await fetchWithTimeout(
@@ -106,8 +111,6 @@ async function getQuantScore(ticker: string): Promise<number> {
   }
 }
 
-// ── Score momentum ETF ────────────────────────────────────────────────
-// Range 52W (40%) + vs MA200 (25%) + MA50 vs MA200 golden/death cross (25%) + variation jour (10%)
 async function getETFMomentumScore(ticker: string): Promise<number> {
   try {
     const res = await fetchWithTimeout(
@@ -116,20 +119,14 @@ async function getETFMomentumScore(ticker: string): Promise<number> {
     const data = await safeParse(res);
     const d = Array.isArray(data) ? data[0] : data;
     if (!d) return 50;
-
-    const price     = d.price ?? 0;
-    const yearHigh  = d.yearHigh ?? price;
-    const yearLow   = d.yearLow  ?? price;
-    const avg50     = d.priceAvg50  ?? price;
-    const avg200    = d.priceAvg200 ?? price;
+    const price = d.price ?? 0, yearHigh = d.yearHigh ?? price, yearLow = d.yearLow ?? price;
+    const avg50 = d.priceAvg50 ?? price, avg200 = d.priceAvg200 ?? price;
     const changePct = d.changePercentage ?? 0;
-
     const range = yearHigh - yearLow;
     const rangeScore = range > 0 ? clamp(((price - yearLow) / range) * 100) : 50;
     const ma200Score = avg200 > 0 ? clamp(50 + ((price - avg200) / avg200) * 200) : 50;
     const crossScore = avg200 > 0 ? clamp(50 + ((avg50 - avg200) / avg200) * 300) : 50;
     const dayScore   = clamp(50 + (changePct / 3) * 50);
-
     return Math.round(rangeScore * 0.4 + ma200Score * 0.25 + crossScore * 0.25 + dayScore * 0.1);
   } catch (err: any) {
     console.error(`[${ticker}] getETFMomentumScore error:`, err?.message ?? err);
@@ -137,7 +134,6 @@ async function getETFMomentumScore(ticker: string): Promise<number> {
   }
 }
 
-// ── Sentiment analystes avec fallback ────────────────────────────────
 export type AnalystData = {
   strongBuy: number; buy: number; hold: number; sell: number; strongSell: number;
   consensus: string; sentimentScore: number; totalAnalysts: number;
@@ -148,8 +144,6 @@ async function getSentimentData(ticker: string): Promise<AnalystData> {
     strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0,
     consensus: "N/A", sentimentScore: 50, totalAnalysts: 0,
   };
-
-  // Endpoint principal
   try {
     const res = await fetchWithTimeout(
       `https://financialmodelingprep.com/stable/grades-consensus?symbol=${ticker}&apikey=${FMP_KEY}`
@@ -160,46 +154,17 @@ async function getSentimentData(ticker: string): Promise<AnalystData> {
       const strongBuy = d.strongBuy ?? 0, buy = d.buy ?? 0, hold = d.hold ?? 0;
       const sell = d.sell ?? 0, strongSell = d.strongSell ?? 0;
       const total = strongBuy + buy + hold + sell + strongSell;
-      if (total > 0) {
-        return {
-          strongBuy, buy, hold, sell, strongSell,
-          consensus: d.consensus ?? "N/A",
-          sentimentScore: Math.round(clamp(((strongBuy + buy) / total) * 100)),
-          totalAnalysts: total,
-        };
-      }
+      if (total > 0) return {
+        strongBuy, buy, hold, sell, strongSell,
+        consensus: d.consensus ?? "N/A",
+        sentimentScore: Math.round(clamp(((strongBuy + buy) / total) * 100)),
+        totalAnalysts: total,
+      };
     }
   } catch { /* continue */ }
-
-  // Fallback endpoint v3
-  try {
-    const res = await fetchWithTimeout(
-      `https://financialmodelingprep.com/api/v3/analyst-stock-recommendations/${ticker}?limit=1&apikey=${FMP_KEY}`
-    );
-    const data = await safeParse(res);
-    const d = Array.isArray(data) ? data[0] : null;
-    if (d) {
-      const strongBuy  = d.analystRatingsStrongBuy  ?? 0;
-      const buy        = d.analystRatingsbuy         ?? 0;
-      const hold       = d.analystRatingsHold        ?? 0;
-      const sell       = d.analystRatingsSell        ?? 0;
-      const strongSell = d.analystRatingsStrongSell  ?? 0;
-      const total = strongBuy + buy + hold + sell + strongSell;
-      if (total > 0) {
-        return {
-          strongBuy, buy, hold, sell, strongSell,
-          consensus: "N/A",
-          sentimentScore: Math.round(clamp(((strongBuy + buy) / total) * 100)),
-          totalAnalysts: total,
-        };
-      }
-    }
-  } catch { /* retourne empty */ }
-
   return empty;
 }
 
-// ── Handler ───────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -228,34 +193,28 @@ export async function GET(req: NextRequest) {
   for (let i = 0; i < WATCHLIST.length; i += 5) {
     const batch = WATCHLIST.slice(i, i + 5);
     const batchResults = await Promise.all(
-      batch.map(async ({ ticker, category, type }) => {
+      batch.map(async ({ ticker, name, category, type }) => {
         if (type === "etf") {
           const momentumScore = await getETFMomentumScore(ticker);
           return {
-            ticker, category, type,
-            quantScore: null,
-            sentimentScore: null,
-            momentumScore,
+            ticker, name, category, type,
+            quantScore: null, sentimentScore: null, momentumScore,
             conviction: momentumScore,
             strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0,
-            consensus: "ETF",
-            totalAnalysts: 0,
+            consensus: "ETF", totalAnalysts: 0,
           };
         }
-
         const [quantScore, analystData] = await Promise.all([
           getQuantScore(ticker),
           getSentimentData(ticker),
         ]);
         const { sentimentScore, ...analystBreakdown } = analystData;
         const hasSentiment = analystData.totalAnalysts > 0;
-        // Si pas d'analystes, conviction = quant seul (pas de 50 par défaut)
         const conviction = hasSentiment
           ? Math.round(quantScore * 0.6 + sentimentScore * 0.4)
           : quantScore;
-
         return {
-          ticker, category, type,
+          ticker, name, category, type,
           quantScore,
           sentimentScore: hasSentiment ? sentimentScore : null,
           momentumScore: null,
@@ -270,25 +229,15 @@ export async function GET(req: NextRequest) {
 
   const sorted = results.sort((a, b) => (b.conviction ?? 0) - (a.conviction ?? 0));
   const fearGreed = await fearGreedPromise;
+  const todayKey = new Date().toISOString().slice(0, 10);
 
-  // ── Historique des classements ────────────────────────────────────────
-  const todayKey = new Date().toISOString().slice(0, 10); // "2026-04-02"
-
-  // Récupérer l'historique existant
   let history: Record<string, { ticker: string; rank: number; conviction: number | null }[]> = {};
   try {
     const existing = await kv.get<{ history?: typeof history }>("finance:scores");
     history = existing?.history ?? {};
   } catch { /* premier run */ }
 
-  // Ajouter le snapshot du jour
-  history[todayKey] = sorted.map((s, i) => ({
-    ticker: s.ticker,
-    rank: i + 1,
-    conviction: s.conviction ?? null,
-  }));
-
-  // Garder seulement les 14 derniers jours
+  history[todayKey] = sorted.map((s, i) => ({ ticker: s.ticker, rank: i + 1, conviction: s.conviction ?? null }));
   const sortedKeys = Object.keys(history).sort().reverse().slice(0, 14);
   const trimmedHistory: typeof history = {};
   for (const k of sortedKeys) trimmedHistory[k] = history[k];
@@ -300,6 +249,6 @@ export async function GET(req: NextRequest) {
     history: trimmedHistory,
   });
 
-  console.log(`[cron/finance] ${sorted.length} tickers scorés. Fear&Greed: ${fearGreed?.score ?? "N/A"}. Historique: ${sortedKeys.length} jours.`);
+  console.log(`[cron/finance] ${sorted.length} tickers. Fear&Greed: ${fearGreed?.score ?? "N/A"}`);
   return NextResponse.json({ ok: true, count: sorted.length, fearGreed });
 }

@@ -20,6 +20,41 @@ async function safeParse(res: Response): Promise<any | null> {
   try { return JSON.parse(text); } catch { return null; }
 }
 
+// ── Alpha Vantage : résolution du ticker depuis un nom ou ticker approximatif ──
+// Retourne le meilleur ticker US, ou à défaut le premier résultat
+async function resolveTickerAV(query: string): Promise<{ ticker: string; name: string; region: string } | null> {
+  if (!AV_KEY) return null;
+  try {
+    const res = await fetchWithTimeout(
+      `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(query)}&apikey=${AV_KEY}`
+    );
+    const data = await safeParse(res);
+    if (!data?.bestMatches?.length) return null;
+
+    const matches = data.bestMatches as Array<{
+      "1. symbol": string;
+      "2. name": string;
+      "4. region": string;
+      "9. matchScore": string;
+    }>;
+
+    // Priorité 1 : match exact du ticker (insensible à la casse)
+    const exact = matches.find(m => m["1. symbol"].toUpperCase() === query.toUpperCase());
+    if (exact) return { ticker: exact["1. symbol"], name: exact["2. name"], region: exact["4. region"] };
+
+    // Priorité 2 : première action cotée en USD (marché US)
+    const usMatch = matches.find(m => m["4. region"] === "United States");
+    if (usMatch) return { ticker: usMatch["1. symbol"], name: usMatch["2. name"], region: usMatch["4. region"] };
+
+    // Priorité 3 : premier résultat quel que soit le marché
+    const first = matches[0];
+    return { ticker: first["1. symbol"], name: first["2. name"], region: first["4. region"] };
+  } catch (err: any) {
+    console.error(`[resolveTickerAV] error:`, err?.message ?? err);
+    return null;
+  }
+}
+
 async function getQuantScore(ticker: string): Promise<number> {
   try {
     const res = await fetchWithTimeout(
@@ -59,7 +94,6 @@ async function getSentimentData(ticker: string) {
   } catch { return empty; }
 }
 
-// ── Alpha Vantage — enrichissement fondamental pour la recherche ──────
 export type AVFundamentals = {
   name: string | null;
   sector: string | null;
@@ -84,14 +118,8 @@ async function getAVFundamentals(ticker: string): Promise<AVFundamentals | null>
       `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${ticker}&apikey=${AV_KEY}`
     );
     const d = await safeParse(res);
-    // Alpha Vantage retourne {} ou { Information: "..." } si ticker inconnu / quota dépassé
     if (!d || !d.Symbol || d.Information) return null;
-
-    const toNum = (v: any) => {
-      const n = parseFloat(v);
-      return isNaN(n) ? null : n;
-    };
-
+    const toNum = (v: any) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
     return {
       name:               d.Name ?? null,
       sector:             d.Sector ?? null,
@@ -109,7 +137,7 @@ async function getAVFundamentals(ticker: string): Promise<AVFundamentals | null>
       description:        d.Description ?? null,
     };
   } catch (err: any) {
-    console.error(`[${ticker}] AV error:`, err?.message ?? err);
+    console.error(`[${ticker}] AV OVERVIEW error:`, err?.message ?? err);
     return null;
   }
 }
@@ -119,42 +147,66 @@ export async function GET(
   { params }: { params: Promise<{ ticker: string }> }
 ) {
   const { ticker: rawTicker } = await params;
-  const ticker = rawTicker.toUpperCase();
+  const rawQuery = rawTicker.toUpperCase();
 
-  // 1. KV d'abord pour les tickers de la watchlist (0 requête API)
+  // ── Étape 1 : résoudre le ticker via AV SYMBOL_SEARCH ──────────────
+  // Permet de chercher "Verbio", "LVMH", "Total Energies", etc.
+  let resolvedTicker = rawQuery;
+  let resolvedName: string | null = null;
+  let resolvedRegion: string | null = null;
+
+  const avResolved = await resolveTickerAV(rawQuery);
+  if (avResolved) {
+    resolvedTicker = avResolved.ticker;
+    resolvedName   = avResolved.name;
+    resolvedRegion = avResolved.region;
+    // Pour les tickers non-US (ex: VBK.DE), on note mais on tente quand même FMP
+    if (avResolved.region !== "United States") {
+      console.log(`[score] Ticker non-US résolu: ${resolvedTicker} (${resolvedRegion}) — FMP peut retourner 50`);
+    }
+  }
+
+  // ── Étape 2 : KV cache pour les tickers de la watchlist ─────────────
   try {
     const stored = await kv.get<{ data: any[] }>("finance:scores");
-    const cached = stored?.data?.find(s => s.ticker === ticker);
+    const cached = stored?.data?.find(s => s.ticker === resolvedTicker);
     if (cached) {
-      // Enrichit quand même avec AV même si en cache — données fraîches et AV n'est pas dans KV
-      const av = await getAVFundamentals(ticker);
-      return NextResponse.json({ ...cached, av });
+      // On enrichit avec AV OVERVIEW (1 appel AV)
+      const av = await getAVFundamentals(resolvedTicker);
+      return NextResponse.json({ ...cached, av, resolvedFrom: rawQuery !== resolvedTicker ? rawQuery : undefined });
     }
   } catch { /* KV indisponible → continue */ }
 
-  // 2. Ticker hors watchlist → appels FMP + AV en parallèle
+  // ── Étape 3 : Score FMP + données AV OVERVIEW en parallèle ──────────
+  // AV SYMBOL_SEARCH a déjà consommé 1 call, OVERVIEW en consomme 1 autre
   try {
     const [quantScore, analystData, av] = await Promise.all([
-      getQuantScore(ticker),
-      getSentimentData(ticker),
-      getAVFundamentals(ticker),
+      getQuantScore(resolvedTicker),
+      getSentimentData(resolvedTicker),
+      getAVFundamentals(resolvedTicker),
     ]);
     const { sentimentScore, ...analystBreakdown } = analystData;
-    const conviction = Math.round(quantScore * 0.6 + sentimentScore * 0.4);
+    const hasSentiment = analystData.totalAnalysts > 0;
+    const conviction = hasSentiment
+      ? Math.round(quantScore * 0.6 + sentimentScore * 0.4)
+      : quantScore;
 
     return NextResponse.json({
-      ticker,
+      ticker: resolvedTicker,
+      name: av?.name ?? resolvedName ?? resolvedTicker,
+      region: resolvedRegion ?? "United States",
       category: "Recherche",
       type: "stock",
       quantScore,
-      sentimentScore,
+      sentimentScore: hasSentiment ? sentimentScore : null,
       conviction,
       ...analystBreakdown,
       av,
+      resolvedFrom: rawQuery !== resolvedTicker ? rawQuery : undefined,
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error(`[score/${ticker}]`, err);
+    console.error(`[score/${resolvedTicker}]`, err);
     return NextResponse.json({ error: "Erreur lors du scoring" }, { status: 500 });
   }
 }
