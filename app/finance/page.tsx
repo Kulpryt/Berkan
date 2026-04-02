@@ -1,3 +1,4 @@
+// app/finance/page.tsx
 export const dynamic = "force-dynamic";
 
 import { kv } from "@vercel/kv";
@@ -19,14 +20,23 @@ export type Score = {
   totalAnalysts: number;
 };
 
+export type FearGreedData = {
+  score: number;
+  rating: string;
+  prevWeek: number;
+  prevMonth: number;
+};
+
 export default async function FinancePage() {
   let watchlist: Score[] = [];
   let updatedAt = "Aucune donnée — lance le cron manuellement";
+  let fearGreed: FearGreedData | null = null;
 
   try {
-    const stored = await kv.get<{ updatedAt: string; data: Score[] }>("finance:scores");
+    const stored = await kv.get<{ updatedAt: string; data: Score[]; fearGreed: FearGreedData | null }>("finance:scores");
     if (stored) {
       watchlist = stored.data;
+      fearGreed = stored.fearGreed ?? null;
       updatedAt = new Date(stored.updatedAt).toLocaleString("fr-FR", {
         weekday: "long", day: "numeric", month: "long",
         hour: "2-digit", minute: "2-digit",
@@ -36,5 +46,5 @@ export default async function FinancePage() {
     console.error("[finance/page] KV error:", err);
   }
 
-  return <FinanceDashboardClient watchlist={watchlist} updatedAt={updatedAt} />;
+  return <FinanceDashboardClient watchlist={watchlist} updatedAt={updatedAt} fearGreed={fearGreed} />;
 }
