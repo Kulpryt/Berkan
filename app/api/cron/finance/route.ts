@@ -38,7 +38,7 @@ export const WATCHLIST: WatchItem[] = [
   { ticker: "ASML",  category: "Europe",        type: "stock" },
   { ticker: "NVO",   category: "Europe",        type: "stock" },
   { ticker: "SAP",   category: "Europe",        type: "stock" },
-  { ticker: "LVMHF", category: "Europe",        type: "stock" },
+  { ticker: "IDEXY", category: "Europe",        type: "stock" }, // LVMH ADR
   { ticker: "JNJ",   category: "Dividendes",    type: "stock" },
   { ticker: "KO",    category: "Dividendes",    type: "stock" },
   { ticker: "PG",    category: "Dividendes",    type: "stock" },
@@ -61,20 +61,14 @@ async function safeParse(res: Response): Promise<any | null> {
   try { return JSON.parse(text); } catch { return null; }
 }
 
-// ── Fear & Greed (CNN, 1 seul appel) ─────────────────────────────────
+// ── Fear & Greed ──────────────────────────────────────────────────────
 export type FearGreedData = {
-  score: number;
-  rating: string;
-  prevWeek: number;
-  prevMonth: number;
+  score: number; rating: string; prevWeek: number; prevMonth: number;
 };
 
 async function getFearAndGreed(): Promise<FearGreedData | null> {
   try {
-    const res = await fetchWithTimeout(
-      "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
-      6000
-    );
+    const res = await fetchWithTimeout("https://production.dataviz.cnn.io/index/fearandgreed/graphdata", 6000);
     const data = await safeParse(res);
     if (!data?.fear_and_greed) return null;
     const fg = data.fear_and_greed;
@@ -90,7 +84,7 @@ async function getFearAndGreed(): Promise<FearGreedData | null> {
   }
 }
 
-// ── FMP scoring ───────────────────────────────────────────────────────
+// ── Score quantitatif (stocks) ────────────────────────────────────────
 async function getQuantScore(ticker: string): Promise<number> {
   try {
     const res = await fetchWithTimeout(
@@ -112,6 +106,38 @@ async function getQuantScore(ticker: string): Promise<number> {
   }
 }
 
+// ── Score momentum ETF ────────────────────────────────────────────────
+// Range 52W (40%) + vs MA200 (25%) + MA50 vs MA200 golden/death cross (25%) + variation jour (10%)
+async function getETFMomentumScore(ticker: string): Promise<number> {
+  try {
+    const res = await fetchWithTimeout(
+      `https://financialmodelingprep.com/stable/quote?symbol=${ticker}&apikey=${FMP_KEY}`
+    );
+    const data = await safeParse(res);
+    const d = Array.isArray(data) ? data[0] : data;
+    if (!d) return 50;
+
+    const price     = d.price ?? 0;
+    const yearHigh  = d.yearHigh ?? price;
+    const yearLow   = d.yearLow  ?? price;
+    const avg50     = d.priceAvg50  ?? price;
+    const avg200    = d.priceAvg200 ?? price;
+    const changePct = d.changePercentage ?? 0;
+
+    const range = yearHigh - yearLow;
+    const rangeScore = range > 0 ? clamp(((price - yearLow) / range) * 100) : 50;
+    const ma200Score = avg200 > 0 ? clamp(50 + ((price - avg200) / avg200) * 200) : 50;
+    const crossScore = avg200 > 0 ? clamp(50 + ((avg50 - avg200) / avg200) * 300) : 50;
+    const dayScore   = clamp(50 + (changePct / 3) * 50);
+
+    return Math.round(rangeScore * 0.4 + ma200Score * 0.25 + crossScore * 0.25 + dayScore * 0.1);
+  } catch (err: any) {
+    console.error(`[${ticker}] getETFMomentumScore error:`, err?.message ?? err);
+    return 50;
+  }
+}
+
+// ── Sentiment analystes avec fallback ────────────────────────────────
 export type AnalystData = {
   strongBuy: number; buy: number; hold: number; sell: number; strongSell: number;
   consensus: string; sentimentScore: number; totalAnalysts: number;
@@ -122,35 +148,65 @@ async function getSentimentData(ticker: string): Promise<AnalystData> {
     strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0,
     consensus: "N/A", sentimentScore: 50, totalAnalysts: 0,
   };
+
+  // Endpoint principal
   try {
     const res = await fetchWithTimeout(
       `https://financialmodelingprep.com/stable/grades-consensus?symbol=${ticker}&apikey=${FMP_KEY}`
     );
     const data = await safeParse(res);
     const d = Array.isArray(data) ? data[0] : data;
-    if (!d) return empty;
-    const strongBuy = d.strongBuy ?? 0, buy = d.buy ?? 0, hold = d.hold ?? 0;
-    const sell = d.sell ?? 0, strongSell = d.strongSell ?? 0;
-    const total = strongBuy + buy + hold + sell + strongSell;
-    return {
-      strongBuy, buy, hold, sell, strongSell,
-      consensus: d.consensus ?? "N/A",
-      sentimentScore: total === 0 ? 50 : Math.round(clamp(((strongBuy + buy) / total) * 100)),
-      totalAnalysts: total,
-    };
-  } catch (err: any) {
-    console.error(`[${ticker}] getSentimentData error:`, err?.message ?? err);
-    return empty;
-  }
+    if (d) {
+      const strongBuy = d.strongBuy ?? 0, buy = d.buy ?? 0, hold = d.hold ?? 0;
+      const sell = d.sell ?? 0, strongSell = d.strongSell ?? 0;
+      const total = strongBuy + buy + hold + sell + strongSell;
+      if (total > 0) {
+        return {
+          strongBuy, buy, hold, sell, strongSell,
+          consensus: d.consensus ?? "N/A",
+          sentimentScore: Math.round(clamp(((strongBuy + buy) / total) * 100)),
+          totalAnalysts: total,
+        };
+      }
+    }
+  } catch { /* continue */ }
+
+  // Fallback endpoint v3
+  try {
+    const res = await fetchWithTimeout(
+      `https://financialmodelingprep.com/api/v3/analyst-stock-recommendations/${ticker}?limit=1&apikey=${FMP_KEY}`
+    );
+    const data = await safeParse(res);
+    const d = Array.isArray(data) ? data[0] : null;
+    if (d) {
+      const strongBuy  = d.analystRatingsStrongBuy  ?? 0;
+      const buy        = d.analystRatingsbuy         ?? 0;
+      const hold       = d.analystRatingsHold        ?? 0;
+      const sell       = d.analystRatingsSell        ?? 0;
+      const strongSell = d.analystRatingsStrongSell  ?? 0;
+      const total = strongBuy + buy + hold + sell + strongSell;
+      if (total > 0) {
+        return {
+          strongBuy, buy, hold, sell, strongSell,
+          consensus: "N/A",
+          sentimentScore: Math.round(clamp(((strongBuy + buy) / total) * 100)),
+          totalAnalysts: total,
+        };
+      }
+    }
+  } catch { /* retourne empty */ }
+
+  return empty;
 }
 
+// ── Handler ───────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Guard quota FMP — préserve KV si quota épuisé
+  // Guard quota FMP
   try {
     const testRes = await fetchWithTimeout(
       `https://financialmodelingprep.com/stable/ratings-snapshot?symbol=AAPL&apikey=${FMP_KEY}`
@@ -165,30 +221,44 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "FMP unreachable" }, { status: 503 });
   }
 
-  console.log("[cron/finance] Début scoring — tickers:", WATCHLIST.length);
-
-  // Fear & Greed en parallèle du premier batch
+  console.log("[cron/finance] Début scoring —", WATCHLIST.length, "tickers");
   const fearGreedPromise = getFearAndGreed();
-
   const results = [];
+
   for (let i = 0; i < WATCHLIST.length; i += 5) {
     const batch = WATCHLIST.slice(i, i + 5);
     const batchResults = await Promise.all(
       batch.map(async ({ ticker, category, type }) => {
-        const isETF = type === "etf";
+        if (type === "etf") {
+          const momentumScore = await getETFMomentumScore(ticker);
+          return {
+            ticker, category, type,
+            quantScore: null,
+            sentimentScore: null,
+            momentumScore,
+            conviction: momentumScore,
+            strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0,
+            consensus: "ETF",
+            totalAnalysts: 0,
+          };
+        }
+
         const [quantScore, analystData] = await Promise.all([
-          isETF ? Promise.resolve(50) : getQuantScore(ticker),
+          getQuantScore(ticker),
           getSentimentData(ticker),
         ]);
         const { sentimentScore, ...analystBreakdown } = analystData;
-        const hasData = !isETF || analystData.totalAnalysts > 0;
-        const conviction = hasData
+        const hasSentiment = analystData.totalAnalysts > 0;
+        // Si pas d'analystes, conviction = quant seul (pas de 50 par défaut)
+        const conviction = hasSentiment
           ? Math.round(quantScore * 0.6 + sentimentScore * 0.4)
-          : null;
+          : quantScore;
+
         return {
           ticker, category, type,
-          quantScore: isETF ? null : quantScore,
-          sentimentScore: analystData.totalAnalysts > 0 ? sentimentScore : null,
+          quantScore,
+          sentimentScore: hasSentiment ? sentimentScore : null,
+          momentumScore: null,
           conviction,
           ...analystBreakdown,
         };
@@ -198,12 +268,7 @@ export async function GET(req: NextRequest) {
     if (i + 5 < WATCHLIST.length) await new Promise(r => setTimeout(r, 800));
   }
 
-  const sorted = results.sort((a, b) => {
-    if (a.conviction == null && b.conviction != null) return 1;
-    if (a.conviction != null && b.conviction == null) return -1;
-    return (b.conviction ?? 0) - (a.conviction ?? 0);
-  });
-
+  const sorted = results.sort((a, b) => (b.conviction ?? 0) - (a.conviction ?? 0));
   const fearGreed = await fearGreedPromise;
 
   await kv.set("finance:scores", {

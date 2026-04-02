@@ -197,7 +197,7 @@ export default function FinanceDashboardClient({
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
         :root { --bg:#F5F5F2; --surface:#FFFFFF; --border:#E8E8E4; --text:#111110; --muted:#888884; --accent:#4A6741; --radius:14px; }
-        body { background:var(--bg); font-family:'DM Sans',sans-serif; -webkit-font-smoothing:antialiased; }
+        body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; -webkit-font-smoothing:antialiased; }
         .row { transition:background 0.12s; }
         .row:hover { background:#FAFAF8; }
         .tab { border:none; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.15s; }
@@ -317,15 +317,15 @@ export default function FinanceDashboardClient({
                 <div key={s.ticker} className="row" style={{ display:"grid", gridTemplateColumns:"32px 100px 100px 1fr 1fr 1fr 190px", gap:14, padding:"13px 18px", borderBottom:i<filtered.length-1?"1px solid var(--border)":"none", alignItems:"center" }}>
                   <span style={{ fontSize:11, color:"var(--muted)" }}>{i+1}</span>
                   <div>
-                    <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:14 }}>{s.ticker}</span>
+                    <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:14, color:"var(--text)" }}>{s.ticker}</span>
                     {s.type==="etf" && <span style={{ display:"block", fontSize:9, fontWeight:600, color:"#7878c4", background:"#f0f0fb", border:"1px solid #d0d0ee", borderRadius:4, padding:"1px 4px", width:"fit-content", marginTop:2 }}>ETF</span>}
                   </div>
                   <span style={{ fontSize:11, color:"var(--muted)" }}>{s.category}</span>
                   <div>
-                    {s.quantScore != null ? (<><span style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:3 }}>{s.quantScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span><ScoreBar value={s.quantScore}/></>) : <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic" }}>ETF</span>}
+                    {s.quantScore != null ? (<><span style={{ fontSize:13, fontWeight:600, color:"var(--text)", display:"block", marginBottom:3 }}>{s.quantScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span><ScoreBar value={s.quantScore}/></>) : <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic" }}>ETF</span>}
                   </div>
                   <div>
-                    {s.totalAnalysts > 0 ? (<><span style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:3 }}>{s.sentimentScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span><ScoreBar value={s.sentimentScore}/></>) : <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic" }}>N/A</span>}
+                    {s.totalAnalysts > 0 ? (<><span style={{ fontSize:13, fontWeight:600, color:"var(--text)", display:"block", marginBottom:3 }}>{s.sentimentScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span><ScoreBar value={s.sentimentScore}/></>) : <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic" }}>N/A</span>}
                   </div>
                   <div>
                     {s.conviction != null ? (
