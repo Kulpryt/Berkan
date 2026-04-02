@@ -27,16 +27,32 @@ export type FearGreedData = {
   prevMonth: number;
 };
 
+export type HistorySnapshot = {
+  ticker: string;
+  rank: number;
+  conviction: number | null;
+};
+
+export type History = Record<string, HistorySnapshot[]>;
+
 export default async function FinancePage() {
   let watchlist: Score[] = [];
   let updatedAt = "Aucune donnée — lance le cron manuellement";
   let fearGreed: FearGreedData | null = null;
+  let history: History = {};
 
   try {
-    const stored = await kv.get<{ updatedAt: string; data: Score[]; fearGreed: FearGreedData | null }>("finance:scores");
+    const stored = await kv.get<{
+      updatedAt: string;
+      data: Score[];
+      fearGreed: FearGreedData | null;
+      history?: History;
+    }>("finance:scores");
+
     if (stored) {
       watchlist = stored.data;
       fearGreed = stored.fearGreed ?? null;
+      history   = stored.history ?? {};
       updatedAt = new Date(stored.updatedAt).toLocaleString("fr-FR", {
         weekday: "long", day: "numeric", month: "long",
         hour: "2-digit", minute: "2-digit",
@@ -46,5 +62,12 @@ export default async function FinancePage() {
     console.error("[finance/page] KV error:", err);
   }
 
-  return <FinanceDashboardClient watchlist={watchlist} updatedAt={updatedAt} fearGreed={fearGreed} />;
+  return (
+    <FinanceDashboardClient
+      watchlist={watchlist}
+      updatedAt={updatedAt}
+      fearGreed={fearGreed}
+      history={history}
+    />
+  );
 }

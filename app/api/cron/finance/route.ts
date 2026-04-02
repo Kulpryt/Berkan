@@ -271,12 +271,35 @@ export async function GET(req: NextRequest) {
   const sorted = results.sort((a, b) => (b.conviction ?? 0) - (a.conviction ?? 0));
   const fearGreed = await fearGreedPromise;
 
+  // ── Historique des classements ────────────────────────────────────────
+  const todayKey = new Date().toISOString().slice(0, 10); // "2026-04-02"
+
+  // Récupérer l'historique existant
+  let history: Record<string, { ticker: string; rank: number; conviction: number | null }[]> = {};
+  try {
+    const existing = await kv.get<{ history?: typeof history }>("finance:scores");
+    history = existing?.history ?? {};
+  } catch { /* premier run */ }
+
+  // Ajouter le snapshot du jour
+  history[todayKey] = sorted.map((s, i) => ({
+    ticker: s.ticker,
+    rank: i + 1,
+    conviction: s.conviction ?? null,
+  }));
+
+  // Garder seulement les 14 derniers jours
+  const sortedKeys = Object.keys(history).sort().reverse().slice(0, 14);
+  const trimmedHistory: typeof history = {};
+  for (const k of sortedKeys) trimmedHistory[k] = history[k];
+
   await kv.set("finance:scores", {
     updatedAt: new Date().toISOString(),
     data: sorted,
     fearGreed,
+    history: trimmedHistory,
   });
 
-  console.log(`[cron/finance] ${sorted.length} tickers scorés. Fear&Greed: ${fearGreed?.score ?? "N/A"}`);
+  console.log(`[cron/finance] ${sorted.length} tickers scorés. Fear&Greed: ${fearGreed?.score ?? "N/A"}. Historique: ${sortedKeys.length} jours.`);
   return NextResponse.json({ ok: true, count: sorted.length, fearGreed });
 }

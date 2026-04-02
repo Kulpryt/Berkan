@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Search, RefreshCw, LogOut, TrendingUp, Users, BarChart2, AlertCircle } from "lucide-react";
-import type { Score, FearGreedData } from "./page";
+import type { Score, FearGreedData, History } from "./page";
 import type { AVFundamentals } from "../api/finance/score/[ticker]/route";
 
 function clamp(v: number, min = 0, max = 100) { return Math.max(min, Math.min(max, v)); }
@@ -53,6 +53,119 @@ function AnalystBar({ strongBuy, buy, hold, sell, strongSell, total }: {
         {strongSell > 0 && <span style={{ fontSize: 10, color: "#8b2315" }}>▼▼ {strongSell}</span>}
         <span style={{ fontSize: 10, color: "#888884" }}>{total} analystes</span>
       </div>
+    </div>
+  );
+}
+
+
+// ── Calcul des stats de classement ───────────────────────────────────
+type RankStats = {
+  rankChange: number | null;   // >0 = a monté, <0 = a descendu
+  streak: number;              // nb jours consécutifs dans la même direction
+  streakDir: "up" | "down" | "stable";
+  isNew: boolean;              // entré dans le top 15 aujourd'hui
+  topStreak: number;           // jours consécutifs en top position
+};
+
+function computeRankStats(ticker: string, currentRank: number, history: History): RankStats {
+  const dates = Object.keys(history).sort().reverse(); // plus récent en premier
+  if (dates.length < 2) return { rankChange: null, streak: 0, streakDir: "stable", isNew: false, topStreak: 0 };
+
+  // Rang hier
+  const yesterday = history[dates[0]]?.find(h => h.ticker === ticker);
+  const twoDaysAgo = history[dates[1]]?.find(h => h.ticker === ticker);
+  const rankChange = yesterday ? yesterday.rank - currentRank : null; // positif = a monté
+
+  // isNew : pas dans top 15 hier, dedans aujourd'hui
+  const isNew = !yesterday && currentRank <= 15;
+
+  // Streak : combien de jours consécutifs en montée/descente
+  let streak = 0;
+  let streakDir: "up" | "down" | "stable" = "stable";
+  let prevRank = currentRank;
+
+  for (const date of dates) {
+    const snap = history[date]?.find(h => h.ticker === ticker);
+    if (!snap) break;
+    const diff = snap.rank - prevRank; // positif = était plus haut avant
+    const dir = diff > 0 ? "down" : diff < 0 ? "up" : "stable";
+    if (streak === 0) {
+      streakDir = dir;
+      streak = dir !== "stable" ? 1 : 0;
+    } else if (dir === streakDir) {
+      streak++;
+    } else {
+      break;
+    }
+    prevRank = snap.rank;
+  }
+
+  // topStreak : jours consécutifs dans le top 5
+  let topStreak = currentRank <= 5 ? 1 : 0;
+  if (currentRank <= 5) {
+    for (const date of dates) {
+      const snap = history[date]?.find(h => h.ticker === ticker);
+      if (snap && snap.rank <= 5) topStreak++;
+      else break;
+    }
+  }
+
+  return { rankChange, streak, streakDir, isNew, topStreak };
+}
+
+// ── Badge de dynamique ────────────────────────────────────────────────
+function RankBadge({ stats }: { stats: RankStats }) {
+  const badges: React.ReactNode[] = [];
+
+  // 🔥 Top streak
+  if (stats.topStreak >= 7) {
+    badges.push(
+      <span key="fire2" style={{ fontSize:10, fontWeight:700, color:"#b85a00", background:"#fff3e0", border:"1px solid #f5c080", borderRadius:20, padding:"2px 7px" }}>
+        🔥🔥 Top {stats.topStreak}j
+      </span>
+    );
+  } else if (stats.topStreak >= 3) {
+    badges.push(
+      <span key="fire1" style={{ fontSize:10, fontWeight:600, color:"#c07020", background:"#fff8ee", border:"1px solid #f5d4a0", borderRadius:20, padding:"2px 7px" }}>
+        🔥 Top {stats.topStreak}j
+      </span>
+    );
+  }
+
+  // ✨ Nouveau entrant
+  if (stats.isNew) {
+    badges.push(
+      <span key="new" style={{ fontSize:10, fontWeight:600, color:"#6040c0", background:"#f4f0fc", border:"1px solid #d4c8f0", borderRadius:20, padding:"2px 7px" }}>
+        ✨ Nouveau
+      </span>
+    );
+  }
+
+  // ⬆⬇ Changement de rang
+  if (stats.rankChange != null && Math.abs(stats.rankChange) >= 1) {
+    const up = stats.rankChange > 0;
+    const abs = Math.abs(stats.rankChange);
+    // Intensité selon streak
+    const intense = stats.streak >= 5;
+    const medium  = stats.streak >= 3;
+    const color   = up ? (intense ? "#2d6e24" : medium ? "#4a9e3a" : "#6aae52") : (intense ? "#8b1c0e" : medium ? "#b84332" : "#c8604a");
+    const bg      = up ? (intense ? "#e4f5e0" : "#f0f8ec") : (intense ? "#fce8e4" : "#fdf0ee");
+    const border  = up ? (intense ? "#a8d8a0" : "#cce8c0") : (intense ? "#f0b8b0" : "#f0c8c0");
+    const arrow   = up ? "▲" : "▼";
+    const suffix  = stats.streak >= 2 ? ` · ${stats.streak}j` : "";
+
+    badges.push(
+      <span key="change" style={{ fontSize:10, fontWeight:700, color, background:bg, border:`1px solid ${border}`, borderRadius:20, padding:"2px 7px" }}>
+        {arrow} {abs}{suffix}
+      </span>
+    );
+  }
+
+  if (badges.length === 0) return null;
+
+  return (
+    <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:4 }}>
+      {badges}
     </div>
   );
 }
@@ -149,11 +262,12 @@ const CATEGORIES = ["Tous", "Big Tech", "Finance", "ETF Large", "ETF Sectoriel",
 type SearchResult = Score & { av?: AVFundamentals | null };
 
 export default function FinanceDashboardClient({
-  watchlist, updatedAt, fearGreed,
+  watchlist, updatedAt, fearGreed, history,
 }: {
   watchlist: Score[];
   updatedAt: string;
   fearGreed: FearGreedData | null;
+  history: History;
 }) {
   const [activeCategory, setActiveCategory] = useState("Tous");
   const [sortBy, setSortBy] = useState<"conviction" | "quantScore" | "sentimentScore">("conviction");
@@ -197,7 +311,7 @@ export default function FinanceDashboardClient({
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
         :root { --bg:#F5F5F2; --surface:#FFFFFF; --border:#E8E8E4; --text:#111110; --muted:#888884; --accent:#4A6741; --radius:14px; }
-        body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; -webkit-font-smoothing:antialiased; }
+        body { background:var(--bg); font-family:'DM Sans',sans-serif; -webkit-font-smoothing:antialiased; }
         .row { transition:background 0.12s; }
         .row:hover { background:#FAFAF8; }
         .tab { border:none; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all 0.15s; }
@@ -306,7 +420,7 @@ export default function FinanceDashboardClient({
           </div>
         ) : (
           <div style={{ background:"var(--surface)", border:"1.5px solid var(--border)", borderRadius:"var(--radius)", overflow:"hidden", marginBottom:40 }}>
-            <div style={{ display:"grid", gridTemplateColumns:"32px 100px 100px 1fr 1fr 1fr 190px", gap:14, padding:"10px 18px", borderBottom:"1px solid var(--border)", background:"var(--bg)" }}>
+            <div style={{ display:"grid", gridTemplateColumns:"32px 1fr 90px 1fr 1fr 1fr 190px", gap:14, padding:"10px 18px", borderBottom:"1px solid var(--border)", background:"var(--bg)" }}>
               {["#","Ticker","Catégorie","Quant","Analystes","Conviction","Répartition analystes"].map(h => (
                 <span key={h} style={{ fontSize:10, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"var(--muted)" }}>{h}</span>
               ))}
@@ -314,18 +428,19 @@ export default function FinanceDashboardClient({
             {filtered.map((s, i) => {
               const { label, color, bg, border } = convictionMeta(s.conviction);
               return (
-                <div key={s.ticker} className="row" style={{ display:"grid", gridTemplateColumns:"32px 100px 100px 1fr 1fr 1fr 190px", gap:14, padding:"13px 18px", borderBottom:i<filtered.length-1?"1px solid var(--border)":"none", alignItems:"center" }}>
+                <div key={s.ticker} className="row" style={{ display:"grid", gridTemplateColumns:"32px 1fr 90px 1fr 1fr 1fr 190px", gap:14, padding:"13px 18px", borderBottom:i<filtered.length-1?"1px solid var(--border)":"none", alignItems:"center" }}>
                   <span style={{ fontSize:11, color:"var(--muted)" }}>{i+1}</span>
                   <div>
                     <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:14, color:"var(--text)" }}>{s.ticker}</span>
                     {s.type==="etf" && <span style={{ display:"block", fontSize:9, fontWeight:600, color:"#7878c4", background:"#f0f0fb", border:"1px solid #d0d0ee", borderRadius:4, padding:"1px 4px", width:"fit-content", marginTop:2 }}>ETF</span>}
+                    <RankBadge stats={computeRankStats(s.ticker, i + 1, history)} />
                   </div>
                   <span style={{ fontSize:11, color:"var(--muted)" }}>{s.category}</span>
                   <div>
-                    {s.quantScore != null ? (<><span style={{ fontSize:13, fontWeight:600, color:"var(--text)", display:"block", marginBottom:3 }}>{s.quantScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span><ScoreBar value={s.quantScore}/></>) : <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic" }}>ETF</span>}
+                    {s.quantScore != null ? (<><span style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:3 }}>{s.quantScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span><ScoreBar value={s.quantScore}/></>) : <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic" }}>ETF</span>}
                   </div>
                   <div>
-                    {s.totalAnalysts > 0 ? (<><span style={{ fontSize:13, fontWeight:600, color:"var(--text)", display:"block", marginBottom:3 }}>{s.sentimentScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span><ScoreBar value={s.sentimentScore}/></>) : <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic" }}>N/A</span>}
+                    {s.totalAnalysts > 0 ? (<><span style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:3 }}>{s.sentimentScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span><ScoreBar value={s.sentimentScore}/></>) : <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic" }}>N/A</span>}
                   </div>
                   <div>
                     {s.conviction != null ? (
