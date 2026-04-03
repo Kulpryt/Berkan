@@ -16,80 +16,84 @@ async function fetchWithTimeout(url: string, ms = 8000): Promise<Response> {
 
 async function safeParse(res: Response): Promise<any | null> {
   const text = await res.text();
-  if (!text || text.startsWith("Premium") || text.startsWith("Limit") || text.startsWith("<!")) return null;
+  if (!text || text.startsWith("Premium") || text.startsWith("Limit") || text.startsWith("<!") || text.includes("Special Endpoint")) return null;
   try { return JSON.parse(text); } catch { return null; }
 }
 
-// ── Alpha Vantage : résolution du ticker depuis un nom ou ticker approximatif ──
-// Retourne le meilleur ticker US, ou à défaut le premier résultat
-async function resolveTickerAV(query: string): Promise<{ ticker: string; name: string; region: string } | null> {
-  if (!AV_KEY) return null;
+async function resolveTicker(query: string): Promise<{ ticker: string; name: string; exchange: string } | null> {
+  // Si ça ressemble déjà à un ticker (ex: AAPL, RXL.PA), pas besoin de résoudre
+  if (/^[A-Z0-9]{1,6}(\.[A-Z]{1,2})?$/.test(query)) {
+    return { ticker: query, name: query, exchange: "" };
+  }
   try {
     const res = await fetchWithTimeout(
-      `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(query)}&apikey=${AV_KEY}`
+      `https://financialmodelingprep.com/stable/search-symbol?query=${encodeURIComponent(query)}&limit=5&apikey=${FMP_KEY}`
     );
     const data = await safeParse(res);
-    if (!data?.bestMatches?.length) return null;
+    if (!Array.isArray(data) || data.length === 0) return null;
 
-    const matches = data.bestMatches as Array<{
-      "1. symbol": string;
-      "2. name": string;
-      "4. region": string;
-      "9. matchScore": string;
-    }>;
-
-    // Priorité 1 : match exact du ticker (insensible à la casse)
-    const exact = matches.find(m => m["1. symbol"].toUpperCase() === query.toUpperCase());
-    if (exact) return { ticker: exact["1. symbol"], name: exact["2. name"], region: exact["4. region"] };
-
-    // Priorité 2 : première action cotée en USD (marché US)
-    const usMatch = matches.find(m => m["4. region"] === "United States");
-    if (usMatch) return { ticker: usMatch["1. symbol"], name: usMatch["2. name"], region: usMatch["4. region"] };
-
-    // Priorité 3 : premier résultat quel que soit le marché
-    const first = matches[0];
-    return { ticker: first["1. symbol"], name: first["2. name"], region: first["4. region"] };
+    const exact = data.find((d: any) => d.symbol.toUpperCase() === query.toUpperCase());
+    if (exact) return { ticker: exact.symbol, name: exact.name, exchange: exact.stockExchange ?? "" };
+    return { ticker: data[0].symbol, name: data[0].name, exchange: data[0].stockExchange ?? "" };
   } catch (err: any) {
-    console.error(`[resolveTickerAV] error:`, err?.message ?? err);
+    console.error(`[resolveTicker] error:`, err?.message ?? err);
     return null;
   }
 }
 
-async function getQuantScore(ticker: string): Promise<number> {
+// Retourne null si bloqué par le plan FMP, un nombre sinon
+async function getQuantScore(ticker: string): Promise<number | null> {
   try {
     const res = await fetchWithTimeout(
       `https://financialmodelingprep.com/stable/ratings-snapshot?symbol=${ticker}&apikey=${FMP_KEY}`
     );
-    const rating = await safeParse(res);
-    const d = Array.isArray(rating) ? rating[0] : rating;
-    if (!d) return 50;
+    const data = await safeParse(res); // safeParse retourne null si "Special Endpoint" détecté
+    if (data === null) return null;    // bloqué ou vide → on signale explicitement
+
+    const d = Array.isArray(data) ? data[0] : data;
+    if (!d) return null;
+
     const subs = [
       d.discountedCashFlowScore, d.returnOnEquityScore, d.returnOnAssetsScore,
       d.debtToEquityScore, d.priceToEarningsScore, d.priceToBookScore,
     ].filter((s): s is number => s != null && s >= 1);
-    if (subs.length === 0) return 50;
+    if (subs.length === 0) return null;
+
     const avg = subs.reduce((a, b) => a + b, 0) / subs.length;
     return Math.round(clamp(((avg - 1) / 4) * 100));
-  } catch { return 50; }
+  } catch { return null; }
 }
 
-async function getSentimentData(ticker: string) {
-  const empty = { strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0, consensus: "N/A", sentimentScore: 50, totalAnalysts: 0 };
+type AnalystData = {
+  strongBuy: number; buy: number; hold: number; sell: number; strongSell: number;
+  consensus: string; sentimentScore: number | null; totalAnalysts: number;
+  blocked: boolean;
+};
+
+async function getSentimentData(ticker: string): Promise<AnalystData> {
+  const empty: AnalystData = {
+    strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0,
+    consensus: "N/A", sentimentScore: null, totalAnalysts: 0, blocked: false,
+  };
   try {
     const res = await fetchWithTimeout(
       `https://financialmodelingprep.com/stable/grades-consensus?symbol=${ticker}&apikey=${FMP_KEY}`
     );
     const data = await safeParse(res);
+    if (data === null) return { ...empty, blocked: true }; // bloqué plan FMP
+
     const d = Array.isArray(data) ? data[0] : data;
     if (!d) return empty;
+
     const strongBuy = d.strongBuy ?? 0, buy = d.buy ?? 0, hold = d.hold ?? 0;
     const sell = d.sell ?? 0, strongSell = d.strongSell ?? 0;
     const total = strongBuy + buy + hold + sell + strongSell;
     return {
       strongBuy, buy, hold, sell, strongSell,
       consensus: d.consensus ?? "N/A",
-      sentimentScore: total === 0 ? 50 : Math.round(clamp(((strongBuy + buy) / total) * 100)),
+      sentimentScore: total === 0 ? null : Math.round(clamp(((strongBuy + buy) / total) * 100)),
       totalAnalysts: total,
+      blocked: false,
     };
   } catch { return empty; }
 }
@@ -149,47 +153,54 @@ export async function GET(
   const { ticker: rawTicker } = await params;
   const rawQuery = rawTicker.toUpperCase();
 
-  // ── Étape 1 : résoudre le ticker via AV SYMBOL_SEARCH ──────────────
-  // Permet de chercher "Verbio", "LVMH", "Total Energies", etc.
   let resolvedTicker = rawQuery;
   let resolvedName: string | null = null;
   let resolvedRegion: string | null = null;
 
-  const avResolved = await resolveTickerAV(rawQuery);
-  if (avResolved) {
-    resolvedTicker = avResolved.ticker;
-    resolvedName   = avResolved.name;
-    resolvedRegion = avResolved.region;
-    // Pour les tickers non-US (ex: VBK.DE), on note mais on tente quand même FMP
-    if (avResolved.region !== "United States") {
-      console.log(`[score] Ticker non-US résolu: ${resolvedTicker} (${resolvedRegion}) — FMP peut retourner 50`);
-    }
+  const resolved = await resolveTicker(rawQuery);
+  if (resolved) {
+    resolvedTicker = resolved.ticker;
+    resolvedName   = resolved.name;
+    resolvedRegion = resolved.exchange || null;
   }
 
-  // ── Étape 2 : KV cache pour les tickers de la watchlist ─────────────
+  // KV cache pour les tickers de la watchlist
   try {
     const stored = await kv.get<{ data: any[] }>("finance:scores");
     const cached = stored?.data?.find(s => s.ticker === resolvedTicker);
     if (cached) {
-      // On enrichit avec AV OVERVIEW (1 appel AV)
       const av = await getAVFundamentals(resolvedTicker);
-      return NextResponse.json({ ...cached, av, resolvedFrom: rawQuery !== resolvedTicker ? rawQuery : undefined });
+      return NextResponse.json({
+        ...cached,
+        av,
+        resolvedFrom: rawQuery !== resolvedTicker ? rawQuery : undefined,
+      });
     }
-  } catch { /* KV indisponible → continue */ }
+  } catch { /* KV indisponible */ }
 
-  // ── Étape 3 : Score FMP + données AV OVERVIEW en parallèle ──────────
-  // AV SYMBOL_SEARCH a déjà consommé 1 call, OVERVIEW en consomme 1 autre
+  // Score FMP + AV en parallèle
   try {
     const [quantScore, analystData, av] = await Promise.all([
       getQuantScore(resolvedTicker),
       getSentimentData(resolvedTicker),
       getAVFundamentals(resolvedTicker),
     ]);
-    const { sentimentScore, ...analystBreakdown } = analystData;
-    const hasSentiment = analystData.totalAnalysts > 0;
-    const conviction = hasSentiment
-      ? Math.round(quantScore * 0.6 + sentimentScore * 0.4)
-      : quantScore;
+
+    const { sentimentScore, blocked, ...analystBreakdown } = analystData;
+    const hasSentiment = analystData.totalAnalysts > 0 && sentimentScore !== null;
+
+    // Conviction = null si tout est bloqué, sinon calcul normal
+    let conviction: number | null = null;
+    if (quantScore !== null && hasSentiment) {
+      conviction = Math.round(quantScore * 0.6 + sentimentScore! * 0.4);
+    } else if (quantScore !== null) {
+      conviction = quantScore;
+    } else if (hasSentiment) {
+      conviction = sentimentScore;
+    }
+    // Si quantScore === null && !hasSentiment → conviction reste null (données indisponibles)
+
+    const dataUnavailable = quantScore === null && !hasSentiment;
 
     return NextResponse.json({
       ticker: resolvedTicker,
@@ -202,6 +213,7 @@ export async function GET(
       conviction,
       ...analystBreakdown,
       av,
+      dataUnavailable, // flag pour le front
       resolvedFrom: rawQuery !== resolvedTicker ? rawQuery : undefined,
       updatedAt: new Date().toISOString(),
     });

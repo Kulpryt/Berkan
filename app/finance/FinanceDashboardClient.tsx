@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, RefreshCw, LogOut, TrendingUp, Users, BarChart2, AlertCircle } from "lucide-react";
 import type { Score, FearGreedData, History } from "./page";
 import type { AVFundamentals } from "../api/finance/score/[ticker]/route";
@@ -27,7 +27,7 @@ function ScoreBar({ value }: { value: number | null }) {
   const { color } = convictionMeta(value);
   return (
     <div style={{ background: "#E8E8E4", borderRadius: 99, height: 4, width: "100%", overflow: "hidden" }}>
-      <div style={{ width: value != null ? `${clamp(value)}%` : "50%", height: "100%", background: value != null ? color : "#D0D0CC", borderRadius: 99, transition: "width 0.6s cubic-bezier(.22,1,.36,1)" }} />
+      <div style={{ width: value != null ? `${clamp(value)}%` : "0%", height: "100%", background: value != null ? color : "#D0D0CC", borderRadius: 99, transition: "width 0.6s cubic-bezier(.22,1,.36,1)" }} />
     </div>
   );
 }
@@ -200,9 +200,214 @@ function AVBlock({ av }: { av: AVFundamentals }) {
   );
 }
 
+// ── Search bar — suggestions UNIQUEMENT via bouton/Enter, pas au keystroke ──
+type SearchSuggestion = {
+  ticker: string;
+  name: string;
+  exchange: string;
+  exchangeShort: string;
+  currency: string;
+};
+
+function TickerSearchBar({
+  value,
+  onChange,
+  onSelect,
+  onSubmit,
+  loading,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSelect: (ticker: string) => void;
+  onSubmit: () => void;
+  loading: boolean;
+}) {
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [open, setOpen]               = useState(false);
+  const [activeIdx, setActiveIdx]     = useState(-1);
+  const [sugLoading, setSugLoading]   = useState(false);
+  const wrapperRef                    = useRef<HTMLDivElement>(null);
+
+  // Fermer si clic extérieur
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Fetch suggestions uniquement sur demande explicite (bouton loupe ou Tab)
+  async function fetchSuggestions() {
+    const q = value.trim();
+    if (q.length < 2) return;
+    setSugLoading(true);
+    try {
+      const res = await fetch(`/api/finance/search?q=${encodeURIComponent(q)}`);
+      const data: SearchSuggestion[] = await res.json();
+      setSuggestions(data);
+      setOpen(data.length > 0);
+      setActiveIdx(-1);
+    } catch {
+      setSuggestions([]);
+      setOpen(false);
+    } finally {
+      setSugLoading(false);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Tab" && !e.shiftKey) {
+      // Tab → ouvre les suggestions sans soumettre
+      e.preventDefault();
+      fetchSuggestions();
+      return;
+    }
+    if (!open || suggestions.length === 0) {
+      if (e.key === "Enter") onSubmit();
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIdx(i => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeIdx >= 0) {
+        handleSelect(suggestions[activeIdx].ticker);
+      } else {
+        setOpen(false);
+        onSubmit();
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  function handleSelect(ticker: string) {
+    setOpen(false);
+    setSuggestions([]);
+    onSelect(ticker);
+  }
+
+  function exchangeColor(ex: string) {
+    if (["NYSE", "NASDAQ", "AMEX"].includes(ex)) return { color: "#3d6b35", bg: "#EFF4EE", border: "#c4d9c1" };
+    if (["EURONEXT", "XPAR", "XAMS", "XBRU", "PAR"].includes(ex)) return { color: "#2060b0", bg: "#eef4fc", border: "#b8d4f0" };
+    return { color: "#888884", bg: "#F8F8F6", border: "#E8E8E4" };
+  }
+
+  return (
+    <div ref={wrapperRef} style={{ position: "relative", flex: 1 }}>
+      <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+        {/* Loupe cliquable pour ouvrir les suggestions */}
+        <button
+          type="button"
+          onClick={fetchSuggestions}
+          title="Chercher des suggestions"
+          style={{ position: "absolute", left: 12, background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", color: sugLoading ? "#4A6741" : "#888884" }}
+        >
+          {sugLoading
+            ? <RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} />
+            : <Search size={14} />}
+        </button>
+        <input
+          type="text"
+          placeholder="Ex: AAPL, RXL.PA, Total Energies… (Tab pour suggestions)"
+          value={value}
+          onChange={e => { onChange(e.target.value); setOpen(false); }} // frappe = ferme suggestions
+          onKeyDown={handleKeyDown}
+          autoComplete="off"
+          style={{
+            width: "100%",
+            padding: "10px 14px 10px 38px",
+            background: "var(--bg)",
+            border: "1.5px solid var(--border)",
+            borderRadius: 10,
+            fontSize: 14,
+            fontFamily: "'DM Sans',sans-serif",
+            color: "var(--text)",
+            outline: "none",
+          }}
+        />
+        {loading && (
+          <RefreshCw size={13} style={{ position: "absolute", right: 14, color: "#888884", animation: "spin 1s linear infinite" }} />
+        )}
+      </div>
+
+      {open && suggestions.length > 0 && (
+        <ul style={{
+          position: "absolute",
+          top: "calc(100% + 6px)",
+          left: 0,
+          right: 0,
+          zIndex: 200,
+          background: "var(--surface)",
+          border: "1.5px solid var(--border)",
+          borderRadius: 12,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
+          overflow: "hidden",
+          listStyle: "none",
+          padding: 4,
+        }}>
+          {suggestions.map((s, idx) => {
+            const { color, bg, border } = exchangeColor(s.exchangeShort);
+            const isActive = idx === activeIdx;
+            return (
+              <li
+                key={`${s.ticker}-${idx}`}
+                onMouseDown={() => handleSelect(s.ticker)}
+                onMouseEnter={() => setActiveIdx(idx)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "9px 12px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  background: isActive ? "var(--bg)" : "transparent",
+                  transition: "background 0.1s",
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 13, color: "var(--text)", minWidth: 60, flexShrink: 0 }}>
+                    {s.ticker}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.name}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  {s.currency && s.currency !== "USD" && (
+                    <span style={{ fontSize: 10, color: "#888884" }}>{s.currency}</span>
+                  )}
+                  <span style={{ fontSize: 10, fontWeight: 600, color, background: bg, border: `1px solid ${border}`, borderRadius: 6, padding: "2px 6px" }}>
+                    {s.exchangeShort}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 const CATEGORIES = ["Tous", "Big Tech", "Finance", "ETF Large", "ETF Sectoriel", "Crypto ETF", "Europe", "Dividendes"];
 
-type SearchResult = Score & { av?: AVFundamentals | null; resolvedFrom?: string; region?: string; consensus?: string };
+type SearchResult = Score & {
+  av?: AVFundamentals | null;
+  resolvedFrom?: string;
+  region?: string;
+  consensus?: string;
+  dataUnavailable?: boolean;
+};
 
 export default function FinanceDashboardClient({
   watchlist, updatedAt, fearGreed, history,
@@ -229,16 +434,24 @@ export default function FinanceDashboardClient({
   const eviterCount   = stocks.filter(s => (s.conviction ?? 0) < 40).length;
   const totalAnalysts = watchlist.reduce((s, x) => s + x.totalAnalysts, 0);
 
-  async function handleSearch() {
-    if (!searchTicker.trim()) return;
+  async function handleSearch(overrideTicker?: string) {
+    const query = (overrideTicker ?? searchTicker).trim();
+    if (!query) return;
     setSearchLoading(true); setSearchError(""); setSearchResult(null);
     try {
-      // Résout via Alpha Vantage SYMBOL_SEARCH
-      const res = await fetch(`/api/finance/score/${encodeURIComponent(searchTicker.trim())}`);
+      const res = await fetch(`/api/finance/score/${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error();
       setSearchResult(await res.json());
-    } catch { setSearchError("Ticker ou entreprise introuvable. Essaie le symbole exact (ex: CRSP, TTE, SAPD)."); }
-    finally { setSearchLoading(false); }
+    } catch {
+      setSearchError("Ticker ou entreprise introuvable. Essaie le symbole exact (ex: RXL.PA, TTE, CRSP).");
+    } finally {
+      setSearchLoading(false);
+    }
+  }
+
+  function handleSuggestionSelect(ticker: string) {
+    setSearchTicker(ticker);
+    handleSearch(ticker);
   }
 
   async function handleLogout() {
@@ -369,7 +582,6 @@ export default function FinanceDashboardClient({
                       <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:14, color:"var(--text)" }}>{s.ticker}</span>
                       {s.type==="etf" && <span style={{ fontSize:9, fontWeight:600, color:"#7878c4", background:"#f0f0fb", border:"1px solid #d0d0ee", borderRadius:4, padding:"1px 4px" }}>ETF</span>}
                     </div>
-                    {/* Nom de la société, plus grand, en foncé */}
                     {(s as any).name && <div style={{ fontSize:12, fontWeight:500, color:"var(--text)", marginTop:2 }}>{(s as any).name}</div>}
                     <RankBadge stats={rankStats} />
                   </div>
@@ -406,17 +618,21 @@ export default function FinanceDashboardClient({
         <div style={{ background:"var(--surface)", border:"1.5px solid var(--border)", borderRadius:"var(--radius)", padding:24 }}>
           <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:17, fontWeight:700, letterSpacing:"-0.02em", marginBottom:3 }}>Analyser un ticker</h2>
           <p style={{ fontSize:12, color:"var(--muted)", marginBottom:18, fontWeight:300 }}>
-            Tape un ticker (<strong>AAPL</strong>) ou un nom d'entreprise (<strong>Nvidia</strong>, <strong>Verbio</strong>, <strong>LVMH</strong>). Alpha Vantage résout le symbole automatiquement.
+            Tape un ticker (<strong>AAPL</strong>, <strong>RXL.PA</strong>) ou un nom d'entreprise (<strong>Rexel</strong>, <strong>LVMH</strong>, <strong>Total</strong>).
+            Clique sur la loupe ou appuie sur <kbd style={{ fontSize:10, background:"var(--bg)", border:"1px solid var(--border)", borderRadius:4, padding:"1px 5px" }}>Tab</kbd> pour voir les suggestions.
           </p>
           <div style={{ display:"flex", gap:10, marginBottom:14 }}>
-            <input type="text" placeholder="Ex: Tesla, CRSP, Total Energies, Verbio…"
+            <TickerSearchBar
               value={searchTicker}
-              onChange={e => setSearchTicker(e.target.value)}
-              onKeyDown={e => e.key==="Enter" && handleSearch()}
-              style={{ flex:1, padding:"10px 14px", background:"var(--bg)", border:"1.5px solid var(--border)", borderRadius:10, fontSize:14, fontFamily:"'DM Sans',sans-serif", color:"var(--text)", outline:"none" }}
+              onChange={setSearchTicker}
+              onSelect={handleSuggestionSelect}
+              onSubmit={() => handleSearch()}
+              loading={searchLoading}
             />
-            <button onClick={handleSearch} disabled={searchLoading || !searchTicker.trim()}
-              style={{ display:"flex", alignItems:"center", gap:7, background:searchTicker&&!searchLoading?"var(--text)":"var(--border)", color:searchTicker&&!searchLoading?"#fff":"var(--muted)", padding:"10px 18px", borderRadius:10, border:"none", fontSize:13, fontWeight:500, fontFamily:"'DM Sans',sans-serif", cursor:searchTicker&&!searchLoading?"pointer":"not-allowed" }}>
+            <button
+              onClick={() => handleSearch()}
+              disabled={searchLoading || !searchTicker.trim()}
+              style={{ display:"flex", alignItems:"center", gap:7, background:searchTicker&&!searchLoading?"var(--text)":"var(--border)", color:searchTicker&&!searchLoading?"#fff":"var(--muted)", padding:"10px 18px", borderRadius:10, border:"none", fontSize:13, fontWeight:500, fontFamily:"'DM Sans',sans-serif", cursor:searchTicker&&!searchLoading?"pointer":"not-allowed", flexShrink:0 }}>
               {searchLoading ? <RefreshCw size={13} style={{ animation:"spin 1s linear infinite" }}/> : <Search size={13}/>}
               Analyser
             </button>
@@ -440,6 +656,14 @@ export default function FinanceDashboardClient({
                   {searchResult.av?.name && <div style={{ fontSize:14, fontWeight:500, color:"var(--text)" }}>{searchResult.av.name}</div>}
                 </div>
 
+                {/* Alerte données indisponibles */}
+                {searchResult.dataUnavailable && (
+                  <div style={{ fontSize:12, color:"#b87020", background:"#fdf5e8", border:"1px solid #f0d090", borderRadius:8, padding:"10px 14px", marginBottom:14, display:"flex", alignItems:"center", gap:8 }}>
+                    <AlertCircle size={14} style={{ flexShrink:0 }} />
+                    Données de scoring non disponibles pour ce ticker sur ton plan FMP. Le scoring est limité aux actions US (NYSE/NASDAQ).
+                  </div>
+                )}
+
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))", gap:14, marginBottom:4 }}>
                   {[
                     { title:"Quant FMP",  value:searchResult.quantScore!=null?`${searchResult.quantScore}/100`:"N/A", color:"var(--text)" },
@@ -461,13 +685,15 @@ export default function FinanceDashboardClient({
                   </div>
                 )}
 
-                <div style={{ marginTop:10 }}>
-                  <span style={{ fontSize:12, fontWeight:600, color, background:bg, border:`1px solid ${border}`, borderRadius:20, padding:"4px 12px" }}>{label}</span>
-                </div>
+                {!searchResult.dataUnavailable && (
+                  <div style={{ marginTop:10 }}>
+                    <span style={{ fontSize:12, fontWeight:600, color, background:bg, border:`1px solid ${border}`, borderRadius:20, padding:"4px 12px" }}>{label}</span>
+                  </div>
+                )}
 
                 {searchResult.av && <AVBlock av={searchResult.av}/>}
 
-                {searchResult.region && searchResult.region !== "United States" && (
+                {searchResult.region && searchResult.region !== "United States" && !searchResult.dataUnavailable && (
                   <p style={{ fontSize:11, color:"#b87020", background:"#fdf5e8", border:"1px solid #f0d090", borderRadius:8, padding:"8px 12px", marginTop:12 }}>
                     ⚠️ Ticker coté sur un marché non-US ({searchResult.region}). Le score FMP peut être incomplet.
                   </p>
