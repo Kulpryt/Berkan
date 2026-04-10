@@ -74,15 +74,15 @@ export type FearGreedData = {
 
 async function getFearAndGreed(): Promise<FearGreedData | null> {
   try {
-    const res = await fetchWithTimeout("https://production.dataviz.cnn.io/index/fearandgreed/graphdata", 6000);
+    const res = await fetchWithTimeout("https://api.alternative.me/fng/?limit=30", 6000);
     const data = await safeParse(res);
-    if (!data?.fear_and_greed) return null;
-    const fg = data.fear_and_greed;
+    if (!data?.data?.length) return null;
+    const [today, prevWeek, prevMonth] = [data.data[0], data.data[6], data.data[29]];
     return {
-      score:     Math.round(fg.score ?? 50),
-      rating:    fg.rating ?? "Neutral",
-      prevWeek:  Math.round(data.fear_and_greed_historical?.previous_1_week?.score ?? fg.score),
-      prevMonth: Math.round(data.fear_and_greed_historical?.previous_1_month?.score ?? fg.score),
+      score:     parseInt(today.value),
+      rating:    today.value_classification,
+      prevWeek:  parseInt(prevWeek?.value ?? today.value),
+      prevMonth: parseInt(prevMonth?.value ?? today.value),
     };
   } catch (err: any) {
     console.error("[cron] Fear&Greed error:", err?.message ?? err);
@@ -190,8 +190,8 @@ export async function GET(req: NextRequest) {
   const fearGreedPromise = getFearAndGreed();
   const results = [];
 
-  for (let i = 0; i < WATCHLIST.length; i += 5) {
-    const batch = WATCHLIST.slice(i, i + 5);
+  for (let i = 0; i < WATCHLIST.length; i += 10) {
+  const batch = WATCHLIST.slice(i, i + 10);
     const batchResults = await Promise.all(
       batch.map(async ({ ticker, name, category, type }) => {
         if (type === "etf") {
@@ -224,7 +224,7 @@ export async function GET(req: NextRequest) {
       })
     );
     results.push(...batchResults);
-    if (i + 5 < WATCHLIST.length) await new Promise(r => setTimeout(r, 800));
+    if (i + 10 < WATCHLIST.length) await new Promise(r => setTimeout(r, 300));
   }
 
   const sorted = results.sort((a, b) => (b.conviction ?? 0) - (a.conviction ?? 0));
