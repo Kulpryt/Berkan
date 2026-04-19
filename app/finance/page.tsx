@@ -10,6 +10,7 @@ export type Score = {
   type: "stock" | "etf";
   quantScore: number | null;
   sentimentScore: number | null;
+  momentumScore: number | null;
   conviction: number | null;
   strongBuy: number;
   buy: number;

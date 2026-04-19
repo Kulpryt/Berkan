@@ -111,7 +111,7 @@ async function getQuantScore(ticker: string): Promise<number> {
   }
 }
 
-async function getETFMomentumScore(ticker: string): Promise<number> {
+async function getMomentumScore(ticker: string): Promise<number> {
   try {
     const res = await fetchWithTimeout(
       `https://financialmodelingprep.com/stable/quote?symbol=${ticker}&apikey=${FMP_KEY}`
@@ -129,7 +129,7 @@ async function getETFMomentumScore(ticker: string): Promise<number> {
     const dayScore   = clamp(50 + (changePct / 3) * 50);
     return Math.round(rangeScore * 0.4 + ma200Score * 0.25 + crossScore * 0.25 + dayScore * 0.1);
   } catch (err: any) {
-    console.error(`[${ticker}] getETFMomentumScore error:`, err?.message ?? err);
+    console.error(`[${ticker}] getMomentumScore error:`, err?.message ?? err);
     return 50;
   }
 }
@@ -195,7 +195,7 @@ export async function GET(req: NextRequest) {
     const batchResults = await Promise.all(
       batch.map(async ({ ticker, name, category, type }) => {
         if (type === "etf") {
-          const momentumScore = await getETFMomentumScore(ticker);
+          const momentumScore = await getMomentumScore(ticker);
           return {
             ticker, name, category, type,
             quantScore: null, sentimentScore: null, momentumScore,
@@ -204,20 +204,22 @@ export async function GET(req: NextRequest) {
             consensus: "ETF", totalAnalysts: 0,
           };
         }
-        const [quantScore, analystData] = await Promise.all([
+        const [quantScore, analystData, momentumScore] = await Promise.all([
           getQuantScore(ticker),
           getSentimentData(ticker),
+          getMomentumScore(ticker),
         ]);
         const { sentimentScore, ...analystBreakdown } = analystData;
         const hasSentiment = analystData.totalAnalysts > 0;
+        // Quant 40% + Analystes 30% + Momentum 30% (momentum pénalise les tendances baissières)
         const conviction = hasSentiment
-          ? Math.round(quantScore * 0.6 + sentimentScore * 0.4)
-          : quantScore;
+          ? Math.round(quantScore * 0.4 + sentimentScore * 0.3 + momentumScore * 0.3)
+          : Math.round(quantScore * 0.6 + momentumScore * 0.4);
         return {
           ticker, name, category, type,
           quantScore,
           sentimentScore: hasSentiment ? sentimentScore : null,
-          momentumScore: null,
+          momentumScore,
           conviction,
           ...analystBreakdown,
         };

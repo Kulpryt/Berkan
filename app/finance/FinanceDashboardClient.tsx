@@ -56,6 +56,17 @@ function AnalystBar({ strongBuy, buy, hold, sell, strongSell, total }: {
   );
 }
 
+// ── Delta conviction 7 jours ──────────────────────────────────────────
+function computeConvictionDelta(ticker: string, currentConviction: number | null, history: History): number | null {
+  if (currentConviction == null) return null;
+  const dates = Object.keys(history).sort().reverse();
+  if (dates.length < 2) return null;
+  const targetDate = dates[Math.min(6, dates.length - 1)];
+  const snap = history[targetDate]?.find(h => h.ticker === ticker);
+  if (!snap || snap.conviction == null) return null;
+  return currentConviction - snap.conviction;
+}
+
 // ── Historique classement ─────────────────────────────────────────────
 type RankStats = {
   rankChange: number | null;
@@ -418,7 +429,7 @@ export default function FinanceDashboardClient({
   history: History;
 }) {
   const [activeCategory, setActiveCategory] = useState("Tous");
-  const [sortBy, setSortBy] = useState<"conviction" | "quantScore" | "sentimentScore">("conviction");
+  const [sortBy, setSortBy] = useState<"conviction" | "quantScore" | "sentimentScore" | "momentumScore">("conviction");
   const [searchTicker, setSearchTicker] = useState("");
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -495,7 +506,7 @@ export default function FinanceDashboardClient({
         <div style={{ marginBottom:24 }}>
           <span style={{ fontSize:10, fontWeight:600, letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--accent)", display:"block", marginBottom:6 }}>Dashboard · Finance IA</span>
           <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:"clamp(26px,4vw,40px)", fontWeight:800, letterSpacing:"-0.03em", marginBottom:4 }}>Indice de Conviction</h1>
-          <p style={{ fontSize:13, color:"var(--muted)", fontWeight:300 }}>Quant FMP 60% · Consensus analystes 40% · Momentum ETF · Sentiment marché CNN</p>
+          <p style={{ fontSize:13, color:"var(--muted)", fontWeight:300 }}>Stocks : Quant 40% · Momentum 30% · Analystes 30% · ETF : Momentum 100% · Sentiment marché CNN</p>
         </div>
 
         {/* Stats */}
@@ -552,7 +563,7 @@ export default function FinanceDashboardClient({
           })}
           <div style={{ marginLeft:"auto", display:"flex", gap:6, alignItems:"center" }}>
             <span style={{ fontSize:10, color:"var(--muted)" }}>Tri :</span>
-            {[["conviction","Conviction"],["quantScore","Quant"],["sentimentScore","Analystes"]].map(([k, l]) => (
+            {[["conviction","Conviction"],["quantScore","Quant"],["sentimentScore","Analystes"],["momentumScore","Momentum"]].map(([k, l]) => (
               <button key={k} onClick={() => setSortBy(k as any)} className="tab"
                 style={{ padding:"4px 10px", borderRadius:20, fontSize:11, background:sortBy===k?"#4A6741":"transparent", color:sortBy===k?"#fff":"var(--muted)", border:`1px solid ${sortBy===k?"#4A6741":"var(--border)"}` }}>{l}</button>
             ))}
@@ -574,6 +585,8 @@ export default function FinanceDashboardClient({
             {filtered.map((s, i) => {
               const { label, color, bg, border } = convictionMeta(s.conviction);
               const rankStats = computeRankStats(s.ticker, i + 1, history);
+              const convDelta = computeConvictionDelta(s.ticker, s.conviction, history);
+              const { color: momColor } = convictionMeta(s.momentumScore);
               return (
                 <div key={s.ticker} className="row" style={{ display:"grid", gridTemplateColumns:"32px 1fr 90px 1fr 1fr 1fr 190px", gap:14, padding:"13px 18px", borderBottom:i<filtered.length-1?"1px solid var(--border)":"none", alignItems:"center" }}>
                   <span style={{ fontSize:11, color:"var(--muted)" }}>{i+1}</span>
@@ -587,9 +600,29 @@ export default function FinanceDashboardClient({
                   </div>
                   <span style={{ fontSize:11, color:"var(--muted)" }}>{s.category}</span>
                   <div>
-                    {s.quantScore != null
-                      ? (<><span style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:3 }}>{s.quantScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span><ScoreBar value={s.quantScore}/></>)
-                      : <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic" }}>Momentum</span>}
+                    {s.quantScore != null ? (
+                      <>
+                        <span style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:3 }}>{s.quantScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span>
+                        <ScoreBar value={s.quantScore}/>
+                        {s.momentumScore != null && (
+                          <div style={{ display:"flex", alignItems:"center", gap:4, marginTop:5 }}>
+                            <span style={{ fontSize:9, color:"var(--muted)", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.05em" }}>Mom.</span>
+                            <span style={{ fontSize:11, fontWeight:700, color: momColor }}>{s.momentumScore}</span>
+                            <ScoreBar value={s.momentumScore}/>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic", display:"block", marginBottom:3 }}>Momentum ETF</span>
+                        {s.momentumScore != null && (
+                          <>
+                            <span style={{ fontSize:13, fontWeight:600, display:"block", marginBottom:3, color: momColor }}>{s.momentumScore}<span style={{ fontSize:10, color:"var(--muted)" }}>/100</span></span>
+                            <ScoreBar value={s.momentumScore}/>
+                          </>
+                        )}
+                      </>
+                    )}
                   </div>
                   <div>
                     {s.totalAnalysts > 0
@@ -602,6 +635,11 @@ export default function FinanceDashboardClient({
                         <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
                           <span style={{ fontSize:17, fontWeight:800, fontFamily:"'Syne',sans-serif", color }}>{s.conviction}</span>
                           <span style={{ fontSize:9, fontWeight:600, color, background:bg, border:`1px solid ${border}`, borderRadius:20, padding:"2px 7px" }}>{label}</span>
+                          {convDelta != null && Math.abs(convDelta) >= 2 && (
+                            <span style={{ fontSize:10, fontWeight:700, color: convDelta > 0 ? "#5a9e4a" : "#b84332" }}>
+                              {convDelta > 0 ? "▲" : "▼"}{Math.abs(convDelta)}
+                            </span>
+                          )}
                         </div>
                         <ScoreBar value={s.conviction}/>
                       </>
